@@ -71,7 +71,14 @@ class Logger:
     
     def set_settings(self, settings):
         """Store the simulation settings."""
-        self.simulation_data["settings"] = settings
+        # Filter out non-JSON serializable objects
+        json_safe_settings = {}
+        for key, value in settings.items():
+            # Only include primitive types that are JSON serializable
+            if isinstance(value, (str, int, float, bool, list, dict)) and not key.startswith('__'):
+                json_safe_settings[key] = value
+        
+        self.simulation_data["settings"] = json_safe_settings
         self._save_simulation_data()
     
     def finalize(self):

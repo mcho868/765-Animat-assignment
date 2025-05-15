@@ -1,36 +1,42 @@
 """
-Configuration settings for the Braitenberg-inspired simulation environment.
-Based on the 765 Proposal and research paper.
+Configuration settings for the Animat model simulation.
 """
 
 # Window settings
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
-WINDOW_TITLE = "Braitenberg Vehicle Simulation"
+WINDOW_TITLE = "Animat Evolution Simulation"
 FPS = 60
 
 # Environment settings
-GRID_SIZE = 100
-OBSTACLE_COUNT = 10
-LIGHT_SOURCE_COUNT = 5
-FOOD_SOURCE_COUNT = 5
-AGENT_COUNT = 20
+ENV_SIZE = 200  # 200x200 area
+OBJECT_PLACEMENT_PADDING = 10
+FOOD_COUNT = 6
+WATER_COUNT = 6
+TRAP_COUNT = 2
 
-# Agent settings
-AGENT_SIZE = 20
-AGENT_SPEED = 2
-AGENT_TURN_RATE = 0.05
-AGENT_VISION_RANGE = 100
-AGENT_SENSOR_ANGLES = [-45, 0, 45]  # Degrees relative to heading
-MAX_STRESS = 100
-STRESS_DECAY_RATE = 0.1
+# Animat settings
+ANIMAT_SIZE = 10
+ANIMAT_MAX_SPEED = 5.0
+SENSOR_RANGE = 100
+BATTERY_MAX = 100
+BATTERY_DECAY_RATE = 1  # Per timestep
 
 # Genetic algorithm settings
-POPULATION_SIZE = 100
-GENERATIONS = 50
-MUTATION_RATE = 0.1
-CROSSOVER_RATE = 0.7
+POPULATION_SIZE = 50
+MUTATION_RATE = 0.004  # 0.4% per bit
+CROSSOVER_RATE = 0.9
+NUM_GENERATIONS = 100
+TOURNAMENT_SIZE = 3
+
+# Sensorimotor link settings
+LINK_PARAM_COUNT = 9
+NUM_LINKS = 18  # 3 sensors * 2 sides * 3 parallel links
+GENOTYPE_SIZE = NUM_LINKS * LINK_PARAM_COUNT + 2  # +2 for sigmoid thresholds
 
 # Simulation mode
 HEADLESS_MODE = False  # Set to True to run simulations without visualization
-LOGGING_ENABLED = True 
+LOGGING_ENABLED = True
+
+# Random seed for reproducibility (set to None for random)
+RANDOM_SEED = 42 

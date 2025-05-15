@@ -1,234 +1,282 @@
 """
-Environment module for setting up the simulation world with resources, obstacles, etc.
-Based on the Braitenberg model as described in the proposal.
+Environment module for the Animat simulation.
+Defines the 2D world, objects, and physics.
 """
-import random
 import numpy as np
-from enum import Enum
+import random
+from enum import Enum, auto
+from config import settings
 
 class EntityType(Enum):
-    """Enumeration of entity types in the environment."""
-    OBSTACLE = 0
-    LIGHT_SOURCE = 1
-    FOOD_SOURCE = 2
-    AGENT = 3
+    """Types of entities in the environment."""
+    FOOD = auto()
+    WATER = auto()
+    TRAP = auto()
+    ANIMAT = auto()
 
 class Entity:
     """Base class for all entities in the environment."""
-    def __init__(self, entity_id, entity_type, position, radius=10):
-        self.id = entity_id
+    next_id = 0
+    
+    def __init__(self, position, entity_type, radius=5):
+        """Initialize an entity.
+        
+        Args:
+            position: Tuple (x, y) coordinates
+            entity_type: EntityType enum value
+            radius: Collision radius
+        """
+        self.id = Entity.next_id
+        Entity.next_id += 1
+        self.position = np.array(position, dtype=float)
         self.type = entity_type
-        self.position = position  # (x, y) tuple
         self.radius = radius
         self.active = True
 
-    def update(self, dt):
-        """Update the entity's state."""
-        pass
-
-class Obstacle(Entity):
-    """Static obstacle that blocks agent movement."""
-    def __init__(self, entity_id, position, radius=15):
-        super().__init__(entity_id, EntityType.OBSTACLE, position, radius)
-        
-class LightSource(Entity):
-    """Light source that agents can sense from a distance."""
-    def __init__(self, entity_id, position, intensity=100, radius=5):
-        super().__init__(entity_id, EntityType.LIGHT_SOURCE, position, radius)
-        self.intensity = intensity
-        self.max_range = intensity * 5  # How far the light reaches
-        
-    def get_intensity_at(self, position):
-        """Calculate light intensity at a given position."""
-        dist = ((position[0] - self.position[0])**2 + 
-                (position[1] - self.position[1])**2)**0.5
-        
-        # Inverse square law for light intensity
-        if dist < self.radius:
-            return self.intensity
-        elif dist > self.max_range:
-            return 0
-        else:
-            return self.intensity * (self.radius / dist)**2
-
 class FoodSource(Entity):
-    """Food source that agents can consume."""
-    def __init__(self, entity_id, position, energy=100, radius=8, respawn_time=30):
-        super().__init__(entity_id, EntityType.FOOD_SOURCE, position, radius)
-        self.max_energy = energy
-        self.energy = energy
-        self.respawn_time = respawn_time
-        self.respawn_timer = 0
-        
-    def consume(self, amount):
-        """Agent consumes some amount of energy from the food source."""
-        if not self.active:
-            return 0
-            
-        amount_consumed = min(self.energy, amount)
-        self.energy -= amount_consumed
-        
-        # Deactivate when depleted
-        if self.energy <= 0:
-            self.active = False
-            self.respawn_timer = self.respawn_time
-            
-        return amount_consumed
-        
-    def update(self, dt):
-        """Update food source state, including respawning."""
-        if not self.active:
-            self.respawn_timer -= dt
-            if self.respawn_timer <= 0:
-                self.energy = self.max_energy
-                self.active = True
+    """Food source that restores battery 1."""
+    def __init__(self, position):
+        super().__init__(position, EntityType.FOOD, radius=5)
+
+class WaterSource(Entity):
+    """Water source that restores battery 2."""
+    def __init__(self, position):
+        super().__init__(position, EntityType.WATER, radius=5)
+
+class Trap(Entity):
+    """Trap that kills animats on collision."""
+    def __init__(self, position):
+        super().__init__(position, EntityType.TRAP, radius=5)
 
 class Environment:
-    """Simulation environment containing all entities and physics."""
-    def __init__(self, width, height, config=None):
+    """The 2D environment containing all entities."""
+    
+    def __init__(self, width=settings.ENV_SIZE, height=settings.ENV_SIZE):
+        """Initialize the environment.
+        
+        Args:
+            width: Width of the environment
+            height: Height of the environment
+        """
         self.width = width
         self.height = height
-        self.config = config
         self.entities = []
-        self.agents = []
-        self.obstacles = []
-        self.light_sources = []
+        self.animats = []
         self.food_sources = []
-        self.entity_counter = 0
+        self.water_sources = []
+        self.traps = []
         
     def add_entity(self, entity):
         """Add an entity to the environment."""
         self.entities.append(entity)
         
-        # Add to specific list based on type
-        if entity.type == EntityType.AGENT:
-            self.agents.append(entity)
-        elif entity.type == EntityType.OBSTACLE:
-            self.obstacles.append(entity)
-        elif entity.type == EntityType.LIGHT_SOURCE:
-            self.light_sources.append(entity)
-        elif entity.type == EntityType.FOOD_SOURCE:
+        # Also add to type-specific lists for faster access
+        if entity.type == EntityType.FOOD:
             self.food_sources.append(entity)
+        elif entity.type == EntityType.WATER:
+            self.water_sources.append(entity)
+        elif entity.type == EntityType.TRAP:
+            self.traps.append(entity)
+        elif entity.type == EntityType.ANIMAT:
+            self.animats.append(entity)
     
-    def generate_obstacles(self, count, min_radius=10, max_radius=30):
-        """Generate random obstacles in the environment."""
-        for _ in range(count):
-            valid_position = False
-            while not valid_position:
-                radius = random.randint(min_radius, max_radius)
-                x = random.randint(radius, self.width - radius)
-                y = random.randint(radius, self.height - radius)
-                position = (x, y)
-                
-                # Check if the position overlaps with any existing entity
-                valid_position = not any(
-                    ((x - e.position[0])**2 + (y - e.position[1])**2)**0.5 < (radius + e.radius + 10)
-                    for e in self.entities
-                )
-            
-            obstacle = Obstacle(self.entity_counter, position, radius)
-            self.entity_counter += 1
-            self.add_entity(obstacle)
-    
-    def generate_light_sources(self, count, intensity_range=(50, 150)):
-        """Generate random light sources in the environment."""
-        for _ in range(count):
-            valid_position = False
-            while not valid_position:
-                x = random.randint(20, self.width - 20)
-                y = random.randint(20, self.height - 20)
-                position = (x, y)
-                
-                # Check if the position overlaps with any existing entity
-                valid_position = not any(
-                    ((x - e.position[0])**2 + (y - e.position[1])**2)**0.5 < (5 + e.radius + 20)
-                    for e in self.entities
-                )
-            
-            intensity = random.randint(*intensity_range)
-            light = LightSource(self.entity_counter, position, intensity)
-            self.entity_counter += 1
-            self.add_entity(light)
-            
-    def generate_food_sources(self, count, energy_range=(50, 200)):
-        """Generate random food sources in the environment."""
-        for _ in range(count):
-            valid_position = False
-            while not valid_position:
-                x = random.randint(20, self.width - 20)
-                y = random.randint(20, self.height - 20)
-                position = (x, y)
-                
-                # Check if the position overlaps with any existing entity
-                valid_position = not any(
-                    ((x - e.position[0])**2 + (y - e.position[1])**2)**0.5 < (8 + e.radius + 15)
-                    for e in self.entities
-                )
-            
-            energy = random.randint(*energy_range)
-            food = FoodSource(self.entity_counter, position, energy)
-            self.entity_counter += 1
-            self.add_entity(food)
-    
-    def update(self, dt):
-        """Update all entities in the environment."""
-        for entity in self.entities:
-            entity.update(dt)
-    
-    def get_light_intensity_at(self, position):
-        """Calculate the total light intensity at a given position."""
-        total_intensity = 0
-        for light in self.light_sources:
-            if light.active:
-                total_intensity += light.get_intensity_at(position)
-        return total_intensity
-    
-    def get_entities_in_range(self, position, radius):
-        """Get all entities within a certain range of a position."""
-        in_range = []
-        for entity in self.entities:
-            dist = ((position[0] - entity.position[0])**2 + 
-                    (position[1] - entity.position[1])**2)**0.5
-            if dist < radius:
-                in_range.append((entity, dist))
-        return in_range
+    def initialize_random_environment(self):
+        """Initialize the environment with random placement of objects."""
+        # Clear any existing entities
+        self.entities = []
+        self.animats = []
+        self.food_sources = []
+        self.water_sources = []
+        self.traps = []
+        
+        padding = settings.OBJECT_PLACEMENT_PADDING
+        
+        # Add food sources
+        for _ in range(settings.FOOD_COUNT):
+            position = (
+                random.randint(padding, self.width - padding),
+                random.randint(padding, self.height - padding)
+            )
+            self.add_entity(FoodSource(position))
+        
+        # Add water sources
+        for _ in range(settings.WATER_COUNT):
+            position = (
+                random.randint(padding, self.width - padding),
+                random.randint(padding, self.height - padding)
+            )
+            self.add_entity(WaterSource(position))
+        
+        # Add traps
+        for _ in range(settings.TRAP_COUNT):
+            position = (
+                random.randint(padding, self.width - padding),
+                random.randint(padding, self.height - padding)
+            )
+            self.add_entity(Trap(position))
     
     def check_collision(self, position, radius, exclude_entity=None):
-        """Check if a position with a given radius collides with any entity."""
-        for entity in self.entities:
-            if entity == exclude_entity:
-                continue
-                
-            if entity.type == EntityType.AGENT or entity.type == EntityType.OBSTACLE:
-                dist = ((position[0] - entity.position[0])**2 + 
-                        (position[1] - entity.position[1])**2)**0.5
-                if dist < radius + entity.radius:
-                    return True, entity
+        """Check if a position collides with any entity.
         
-        # Check boundaries
-        if (position[0] < radius or position[0] > self.width - radius or
-            position[1] < radius or position[1] > self.height - radius):
-            return True, None
+        Args:
+            position: (x, y) tuple to check
+            radius: Collision radius
+            exclude_entity: Optional entity to exclude from collision check
             
-        return False, None
-        
-    def consume_food_at(self, position, radius, amount):
-        """Agent attempts to consume food at a given position."""
-        total_consumed = 0
-        for food in self.food_sources:
-            if not food.active:
+        Returns:
+            Tuple (collision_detected, entity_collided_with)
+        """
+        for entity in self.entities:
+            if entity == exclude_entity or not entity.active:
                 continue
                 
-            dist = ((position[0] - food.position[0])**2 + 
-                    (position[1] - food.position[1])**2)**0.5
-            if dist < radius + food.radius:
-                consumed = food.consume(amount)
-                total_consumed += consumed
+            # Simple distance-based collision
+            distance = np.linalg.norm(np.array(position) - entity.position)
+            if distance < (radius + entity.radius):
+                return True, entity
                 
-        return total_consumed
+        return False, None
+    
+    def get_sensor_readings(self, animat):
+        """Get sensor readings for an animat based on its position.
         
-    def initialize_random_environment(self, obstacle_count, light_count, food_count):
-        """Initialize the environment with random entities."""
-        self.generate_obstacles(obstacle_count)
-        self.generate_light_sources(light_count)
-        self.generate_food_sources(food_count) 
+        Args:
+            animat: The animat to get sensor readings for
+            
+        Returns:
+            Dict of sensor readings for each sensor type and side
+        """
+        readings = {
+            'food_left': 0.0, 'food_right': 0.0,
+            'water_left': 0.0, 'water_right': 0.0,
+            'trap_left': 0.0, 'trap_right': 0.0
+        }
+        
+        # Define the range vector for each side (assuming animat has direction)
+        # Rotate the direction vector 90 degrees for left/right
+        left_vec = np.array([-animat.direction[1], animat.direction[0]])
+        right_vec = np.array([animat.direction[1], -animat.direction[0]])
+        
+        # Calculate readings for each entity type
+        for entity in self.entities:
+            if not entity.active or entity.type == EntityType.ANIMAT:
+                continue
+                
+            # Vector from animat to entity
+            vec_to_entity = entity.position - animat.position
+            distance = np.linalg.norm(vec_to_entity)
+            
+            # Skip if outside sensor range
+            if distance > settings.SENSOR_RANGE:
+                continue
+                
+            # Normalize direction to entity
+            if distance > 0:
+                direction_to_entity = vec_to_entity / distance
+            else:
+                continue  # Skip if at same position
+                
+            # Calculate dot product with left and right vectors to determine side
+            left_dot = np.dot(direction_to_entity, left_vec)
+            right_dot = np.dot(direction_to_entity, right_vec)
+            
+            # Calculate sensor value (stronger when closer and more directly to one side)
+            # Sensor output is between 0 and 100, with 100 being at the source (distance=0)
+            # and decreasing as distance increases
+            sensor_value = max(0, 100 * (1 - distance / settings.SENSOR_RANGE))
+            
+            # Apply to the appropriate sensor based on entity type and side
+            if entity.type == EntityType.FOOD:
+                if left_dot > 0:
+                    readings['food_left'] = max(readings['food_left'], sensor_value * left_dot)
+                if right_dot > 0:
+                    readings['food_right'] = max(readings['food_right'], sensor_value * right_dot)
+            
+            elif entity.type == EntityType.WATER:
+                if left_dot > 0:
+                    readings['water_left'] = max(readings['water_left'], sensor_value * left_dot)
+                if right_dot > 0:
+                    readings['water_right'] = max(readings['water_right'], sensor_value * right_dot)
+            
+            elif entity.type == EntityType.TRAP:
+                if left_dot > 0:
+                    readings['trap_left'] = max(readings['trap_left'], sensor_value * left_dot)
+                if right_dot > 0:
+                    readings['trap_right'] = max(readings['trap_right'], sensor_value * right_dot)
+        
+        return readings
+    
+    def respawn_entity(self, entity):
+        """Respawn an entity at a random location.
+        
+        Args:
+            entity: The entity to respawn
+        """
+        # Generate new random position
+        padding = settings.OBJECT_PLACEMENT_PADDING
+        new_position = (
+            random.randint(padding, self.width - padding),
+            random.randint(padding, self.height - padding)
+        )
+        
+        # Update entity position
+        entity.position = np.array(new_position, dtype=float)
+        
+    def wrap_position(self, entity):
+        """Wrap entity position if it goes outside environment boundaries.
+        
+        Args:
+            entity: The entity to wrap
+        """
+        # Wrap x-coordinate
+        if entity.position[0] < 0:
+            entity.position[0] = self.width
+        elif entity.position[0] > self.width:
+            entity.position[0] = 0
+            
+        # Wrap y-coordinate
+        if entity.position[1] < 0:
+            entity.position[1] = self.height
+        elif entity.position[1] > self.height:
+            entity.position[1] = 0
+    
+    def update(self, dt):
+        """Update the environment for one timestep.
+        
+        Args:
+            dt: Time delta in seconds
+        """
+        # Update animats (movement, collisions, battery depletion)
+        for animat in self.animats[:]:  # Use a copy to allow removal
+            if not animat.active:
+                continue
+                
+            # Update animat position
+            animat.update(dt, self)
+            
+            # Wrap position if animat moves outside boundaries
+            self.wrap_position(animat)
+            
+            # Check for collisions with entities
+            collision, entity = self.check_collision(animat.position, animat.radius, animat)
+            
+            if collision:
+                if entity.type == EntityType.FOOD:
+                    # Replenish battery 1
+                    animat.batteries[0] = settings.BATTERY_MAX
+                    # Make food disappear and reappear at random location
+                    self.respawn_entity(entity)
+                    
+                elif entity.type == EntityType.WATER:
+                    # Replenish battery 2
+                    animat.batteries[1] = settings.BATTERY_MAX
+                    # Make water disappear and reappear at random location
+                    self.respawn_entity(entity)
+                    
+                elif entity.type == EntityType.TRAP:
+                    # Animat dies
+                    animat.active = False
+                    
+            # Check if batteries are depleted
+            if animat.batteries[0] <= 0 and animat.batteries[1] <= 0:
+                animat.active = False 

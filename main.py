@@ -1,102 +1,95 @@
 """
-Main entry point for the Braitenberg-inspired simulation environment.
-This file sets up and runs the simulation with specified agents.
+Main entry point for the Animat simulation.
+Evolves animats with sensorimotor links using a genetic algorithm.
 """
-import random
 import argparse
+import random
+import numpy as np
 from config import settings
 from core.simulator import Simulator
-from agents.simple_agent import SimpleAgent
-from agents.stress_agent import StressAgent
 
 def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Braitenberg-inspired simulation")
+    """Parse command line arguments.
     
-    parser.add_argument("--headless", action="store_true", help="Run simulation without visualization")
-    parser.add_argument("--agents", type=int, default=settings.AGENT_COUNT, help="Number of agents to simulate")
-    parser.add_argument("--obstacles", type=int, default=settings.OBSTACLE_COUNT, help="Number of obstacles in environment")
-    parser.add_argument("--lights", type=int, default=settings.LIGHT_SOURCE_COUNT, help="Number of light sources")
-    parser.add_argument("--food", type=int, default=settings.FOOD_SOURCE_COUNT, help="Number of food sources")
-    parser.add_argument("--time", type=float, default=None, help="Maximum simulation time in seconds")
-    parser.add_argument("--simple-ratio", type=float, default=0.5, 
-                        help="Ratio of simple agents to stress agents (0-1)")
+    Returns:
+        Parsed arguments
+    """
+    parser = argparse.ArgumentParser(description="Animat Evolution Simulation")
+    
+    parser.add_argument("--headless", action="store_true", help="Run in headless mode (no visualization)")
+    parser.add_argument("--generations", type=int, default=settings.NUM_GENERATIONS, 
+                        help="Number of generations to evolve")
+    parser.add_argument("--population", type=int, default=settings.POPULATION_SIZE,
+                        help="Population size for genetic algorithm")
+    parser.add_argument("--seed", type=int, default=settings.RANDOM_SEED,
+                        help="Random seed for reproducibility (None for random)")
+    parser.add_argument("--run-best", action="store_true",
+                        help="Run simulation with the best evolved animat")
+    parser.add_argument("--visualize-only", action="store_true",
+                        help="Only visualize, don't evolve")
+    parser.add_argument("--visualize-evolution", action="store_true",
+                        help="Visualize evolution in progress instead of headless mode")
+    parser.add_argument("--parallel-viz", type=int, default=1,
+                        help="Number of animats to visualize in parallel (default: 1)")
     
     return parser.parse_args()
-
-def create_agents(simulator, count, simple_ratio):
-    """Create and add agents to the simulator."""
-    # Calculate counts
-    simple_count = int(count * simple_ratio)
-    stress_count = count - simple_count
-    
-    agents = []
-    
-    # Create simple agents with different behaviors
-    for i in range(simple_count):
-        # Random position avoiding obstacles
-        valid_position = False
-        while not valid_position:
-            x = random.randint(50, simulator.width - 50)
-            y = random.randint(50, simulator.height - 50)
-            position = (x, y)
-            collision, _ = simulator.environment.check_collision(position, settings.AGENT_SIZE, None)
-            valid_position = not collision
-            
-        # Assign behavior type (1, 2, or 3)
-        behavior_type = random.choice([1, 2, 3])
-        
-        # Create the agent
-        agent = SimpleAgent(i, position, behavior_type)
-        agents.append(agent)
-        
-    # Create stress agents
-    for i in range(simple_count, count):
-        # Random position avoiding obstacles
-        valid_position = False
-        while not valid_position:
-            x = random.randint(50, simulator.width - 50)
-            y = random.randint(50, simulator.height - 50)
-            position = (x, y)
-            collision, _ = simulator.environment.check_collision(position, settings.AGENT_SIZE, None)
-            valid_position = not collision
-            
-        # Create the agent
-        agent = StressAgent(i, position)
-        agents.append(agent)
-    
-    # Add all agents to simulator
-    simulator.add_agents(agents)
-    
-    return agents
 
 def main():
     """Main function to set up and run the simulation."""
     # Parse command line arguments
     args = parse_arguments()
     
+    # Set up random seed for reproducibility
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+    
     # Override settings with command line arguments
-    if args.headless:
-        settings.HEADLESS_MODE = True
+    settings.HEADLESS_MODE = args.headless
+    settings.POPULATION_SIZE = args.population
+    settings.NUM_GENERATIONS = args.generations
     
     # Create simulator
     simulator = Simulator(headless=settings.HEADLESS_MODE)
     
-    # Initialize environment with entities
-    simulator.environment.initialize_random_environment(
-        args.obstacles, args.lights, args.food
-    )
+    if args.visualize_only:
+        # Just visualize a random animat
+        simulator.environment.initialize_random_environment()
+        
+        # Create and add a random animat
+        from agents.base_agent import Animat
+        center_pos = (simulator.environment.width/2, simulator.environment.height/2)
+        animat = Animat(center_pos)
+        simulator.environment.add_entity(animat)
+        
+        # Run visualization
+        print("Running visualization with a random animat")
+        simulator.run_best_animat(animat.genome, max_time=60)
+        
+    else:
+        # Run evolution
+        print(f"Starting evolution with population size {settings.POPULATION_SIZE} "
+              f"for {settings.NUM_GENERATIONS} generations")
+        
+        if args.visualize_evolution:
+            print(f"Visualizing evolution in progress with {args.parallel_viz} parallel animats")
+            best_genome, best_fitness = simulator.run_evolution_with_visualization(
+                args.generations, parallel_count=args.parallel_viz)
+        else:
+            best_genome, best_fitness = simulator.run_evolution(args.generations)
+        
+        print(f"Evolution complete! Best fitness: {best_fitness:.2f}")
+        
+        # Plot statistics
+        simulator.plot_stats()
+        
+        # Run simulation with best genome if requested
+        if args.run_best:
+            print("Running simulation with best evolved animat")
+            simulator.run_best_animat(best_genome, max_time=60)
     
-    # Create and add agents
-    agents = create_agents(simulator, args.agents, args.simple_ratio)
-    
-    print(f"Starting simulation with {len(agents)} agents")
-    print(f"Environment has {len(simulator.environment.obstacles)} obstacles, "
-          f"{len(simulator.environment.light_sources)} light sources, and "
-          f"{len(simulator.environment.food_sources)} food sources")
-    
-    # Run the simulation
-    simulator.run(max_time=args.time)
+    # Clean up
+    simulator.cleanup()
     
 if __name__ == "__main__":
     main() 

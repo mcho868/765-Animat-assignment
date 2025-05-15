@@ -31,6 +31,8 @@ def parse_arguments():
                         help="Visualize evolution in progress instead of headless mode")
     parser.add_argument("--parallel-viz", type=int, default=1,
                         help="Number of animats to visualize in parallel (default: 1)")
+    parser.add_argument("--speed-multiplier", type=float, default=1.0,
+                        help="Speed multiplier for simulation (higher = faster, default: 1.0)")
     
     return parser.parse_args()
 
@@ -64,7 +66,7 @@ def main():
         
         # Run visualization
         print("Running visualization with a random animat")
-        simulator.run_best_animat(animat.genome, max_time=60)
+        simulator.run_best_animat(animat.genome, max_time=60, speed_multiplier=args.speed_multiplier)
         
     else:
         # Run evolution
@@ -72,9 +74,9 @@ def main():
               f"for {settings.NUM_GENERATIONS} generations")
         
         if args.visualize_evolution:
-            print(f"Visualizing evolution in progress with {args.parallel_viz} parallel animats")
+            print(f"Visualizing evolution in progress with {args.parallel_viz} parallel animats (speed: {args.speed_multiplier}x)")
             best_genome, best_fitness = simulator.run_evolution_with_visualization(
-                args.generations, parallel_count=args.parallel_viz)
+                args.generations, parallel_count=args.parallel_viz, speed_multiplier=args.speed_multiplier)
         else:
             best_genome, best_fitness = simulator.run_evolution(args.generations)
         
@@ -86,7 +88,7 @@ def main():
         # Run simulation with best genome if requested
         if args.run_best:
             print("Running simulation with best evolved animat")
-            simulator.run_best_animat(best_genome, max_time=60)
+            simulator.run_best_animat(best_genome, max_time=60, speed_multiplier=args.speed_multiplier)
     
     # Clean up
     simulator.cleanup()

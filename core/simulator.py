@@ -252,12 +252,13 @@ class Simulator:
         # Return the best genome
         return self.ga.get_best_genome()
         
-    def run_evolution_with_visualization(self, num_generations=settings.NUM_GENERATIONS, parallel_count=1):
+    def run_evolution_with_visualization(self, num_generations=settings.NUM_GENERATIONS, parallel_count=1, speed_multiplier=1.0):
         """Run the evolutionary algorithm with visualization.
         
         Args:
             num_generations: Number of generations to evolve
             parallel_count: Number of animats to visualize in parallel
+            speed_multiplier: Speed multiplier for simulation (higher = faster)
             
         Returns:
             Tuple of (best_genome, best_fitness)
@@ -341,8 +342,11 @@ class Simulator:
                     dt = current_time - last_time
                     last_time = current_time
                     
-                    # Cap dt to avoid large jumps
-                    dt = min(dt, 0.1)
+                    # Apply speed multiplier
+                    dt = dt * speed_multiplier
+                    
+                    # Cap dt to avoid large jumps (increased for speed)
+                    dt = min(dt, 0.2 * speed_multiplier)
                     
                     # Handle events
                     if not self.handle_events():
@@ -402,10 +406,13 @@ class Simulator:
                     # Update the display
                     pygame.display.flip()
                     
-                    # Add a small delay
-                    pygame.time.delay(10)
+                    # Calculate delay based on speed multiplier (lower = faster)
+                    delay = max(1, int(10 / speed_multiplier))
+                    pygame.time.delay(delay)
                     
-                    steps += 1
+                    # Increase step count proportionally to speed
+                    step_increment = max(1, int(speed_multiplier))
+                    steps += step_increment
                 
                 # Calculate fitness for each animat in the batch
                 for i, animat in enumerate(animats):
@@ -451,12 +458,13 @@ class Simulator:
         # Return the best genome
         return self.ga.get_best_genome()
         
-    def run_best_animat(self, genome, max_time=60):
+    def run_best_animat(self, genome, max_time=60, speed_multiplier=1.0):
         """Run a simulation with the best animat.
         
         Args:
             genome: Genome to use for the animat
             max_time: Maximum simulation time in seconds
+            speed_multiplier: Speed multiplier for simulation (higher = faster)
         """
         # Reset the environment
         self.environment = Environment()
@@ -478,8 +486,11 @@ class Simulator:
             dt = current_time - last_time
             last_time = current_time
             
+            # Apply speed multiplier
+            dt = dt * speed_multiplier
+            
             # Cap dt to avoid large jumps
-            dt = min(dt, 0.1)
+            dt = min(dt, 0.2 * speed_multiplier)
             
             # Handle events
             if not self.handle_events():

@@ -3,8 +3,8 @@ Configuration settings for the Animat model simulation.
 """
 
 # Window settings
-WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 600
+WINDOW_WIDTH = 1200  # 0 means use full screen width
+WINDOW_HEIGHT = 800 # 0 means use full screen height
 WINDOW_TITLE = "Animat Evolution Simulation"
 FPS = 60
 

@@ -3,7 +3,7 @@ Configuration settings for the Animat model simulation.
 """
 
 #Window settings
-WINDOW_WIDTH = 1600
+WINDOW_WIDTH = 2000
 WINDOW_HEIGHT = 1400
 WINDOW_TITLE = "Animat Evolution Simulation"
 FPS = 60
@@ -21,7 +21,7 @@ SOURCE_SIZE = 16
 ANIMAT_MAX_SPEED = 2.8
 SENSOR_RANGE = 100
 BATTERY_MAX = 200
-BATTERY_DECAY_RATE = 100  # Per timestep (adjusted to deplete in 200 steps with dt=0.1)
+BATTERY_DECAY_RATE = 1  # Decay per second. With dt=0.1, this is 1 unit per timestep
 ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 
 #Genetic algorithm settings

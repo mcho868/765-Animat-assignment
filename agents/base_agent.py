@@ -126,12 +126,6 @@ class Animat:
                 'offset_mod': offset_mod_val,
                 'battery': battery_val,
             }
-            print(f"Link Parameters:")
-            print(f"  Offset: {link_params['offset']:.2f}")
-            print(f"  Gradients: {link_params['grad1']:.2f}, {link_params['grad2']:.2f}, {link_params['grad3']:.2f}")
-            print(f"  Thresholds: {link_params['thresh1']:.2f}, {link_params['thresh2']:.2f}")
-            print(f"  Modulations: slope={link_params['slope_mod']:.2f}, offset={link_params['offset_mod']:.2f}")
-            print(f"  Battery: {link_params['battery']}")
             self.links.append(link_params)
             
     def get_sensor_to_wheel_mapping(self, sensor_index):
@@ -306,3 +300,11 @@ class Animat:
         # F = (B1 + B2) / (2 * BATTERY_MAX) to align with paper's F = (B1 + B2)/400.0
         # where BATTERY_MAX from paper is 200.
         return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)
+
+    def get_forward_speed(self):
+        """
+        Calculates the current forward speed of the animat.
+        This is the average of its two wheel speeds.
+        The wheel speeds themselves are scaled by ANIMAT_MAX_SPEED.
+        """
+        return (self.wheel_speeds[0] + self.wheel_speeds[1]) / 2.0

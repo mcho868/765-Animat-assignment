@@ -14,6 +14,14 @@ class Animat:
     - Two batteries (energy levels)
     """
     
+    def _scale_genome_value(self, val, min_val, max_val):
+        """Scales a genome integer (0-99) to the range [min_val, max_val]."""
+        return (val / 99.0) * (max_val - min_val) + min_val
+
+    def _scale_sigmoid_genome_value(self, val):
+        """Scales a genome integer (0-99) to the range [-3.0, 3.0]."""
+        return (val / 99.0) * 6.0 - 3.0
+
     def __init__(self, position, genome=None, direction=None):
         """Initialize an Animat with position and optional genome.
         
@@ -50,10 +58,10 @@ class Animat:
         else:
             self.genome = genome.copy()
             
-        # Extract sigmoid thresholds from genome
+        # Extract and scale sigmoid thresholds from genome
         self.sigmoid_thresholds = [
-            self.genome[-2],  # Left wheel
-            self.genome[-1]   # Right wheel
+            self._scale_sigmoid_genome_value(self.genome[-2]),  # Left wheel
+            self._scale_sigmoid_genome_value(self.genome[-1])   # Right wheel
         ]
             
         # Parse genome into sensorimotor links
@@ -66,7 +74,7 @@ class Animat:
         # Final 2 genes are sigmoid thresholds for wheels
         
         genome_size = settings.GENOTYPE_SIZE
-        self.genome = np.random.randint(-50, 51, genome_size)
+        self.genome = np.random.randint(0, 100, genome_size)
         
         # Set battery indicators (even=battery1, odd=battery2)
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
@@ -74,22 +82,56 @@ class Animat:
             self.genome[i + 8] = np.random.choice([0, 1])  # 0 for battery 1, 1 for battery 2
             
     def parse_genome(self):
-        """Parse the genome into sensorimotor links."""
+        """Parse the genome into sensorimotor links according to paper's specification."""
         self.links = []
         
         # Process each link's parameters
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
+            # Scale offset (0-99 to -100 to +100)
+            offset_val = self._scale_genome_value(self.genome[i], -100.0, 100.0)
+
+            # Scale gradients (0-99 to -pi/2 to +pi/2, then tan)
+            angle1 = (self.genome[i + 1] / 99.0) * np.pi - (np.pi / 2.0)
+            grad1_val = np.tan(angle1)
+
+            # Scale threshold 1 (0-99 to -100 to +100)
+            thresh1_val = self._scale_genome_value(self.genome[i + 2], -100.0, 100.0)
+
+            angle2 = (self.genome[i + 3] / 99.0) * np.pi - (np.pi / 2.0)
+            grad2_val = np.tan(angle2)
+
+            # Scale raw thresh2 value first (0-99 to -100 to +100)
+            thresh2_raw_scaled = self._scale_genome_value(self.genome[i + 4], -100.0, 100.0)
+            # Enforce that the second threshold must follow the first
+            thresh2_val = max(thresh1_val, thresh2_raw_scaled)
+
+            angle3 = (self.genome[i + 5] / 99.0) * np.pi - (np.pi / 2.0)
+            grad3_val = np.tan(angle3)
+
+            # Slope and offset modulation degrees (paper does not explicitly scale these beyond being 0-99 derived)
+            # Current code uses / 10.0. Retaining this specific scaling.
+            slope_mod_val = self.genome[i + 6] / 10.0
+            offset_mod_val = self.genome[i + 7] / 10.0
+            
+            battery_val = self.genome[i + 8] # Already 0 or 1, used directly
+
             link_params = {
-                'offset': self.genome[i] / 10.0,                  # Initial output offset
-                'grad1': self.genome[i + 1] / 10.0,               # Gradient 1
-                'thresh1': self.genome[i + 2],                    # Threshold 1
-                'grad2': self.genome[i + 3] / 10.0,               # Gradient 2
-                'thresh2': self.genome[i + 4],                    # Threshold 2
-                'grad3': self.genome[i + 5] / 10.0,               # Gradient 3
-                'slope_mod': self.genome[i + 6] / 10.0,           # Slope modulation by battery
-                'offset_mod': self.genome[i + 7] / 10.0,          # Offset modulation by battery
-                'battery': self.genome[i + 8],                    # Battery number (0=battery1, 1=battery2)
+                'offset': offset_val,
+                'grad1': grad1_val,
+                'thresh1': thresh1_val,
+                'grad2': grad2_val,
+                'thresh2': thresh2_val,
+                'grad3': grad3_val,
+                'slope_mod': slope_mod_val,
+                'offset_mod': offset_mod_val,
+                'battery': battery_val,
             }
+            print(f"Link Parameters:")
+            print(f"  Offset: {link_params['offset']:.2f}")
+            print(f"  Gradients: {link_params['grad1']:.2f}, {link_params['grad2']:.2f}, {link_params['grad3']:.2f}")
+            print(f"  Thresholds: {link_params['thresh1']:.2f}, {link_params['thresh2']:.2f}")
+            print(f"  Modulations: slope={link_params['slope_mod']:.2f}, offset={link_params['offset_mod']:.2f}")
+            print(f"  Battery: {link_params['battery']}")
             self.links.append(link_params)
             
     def get_sensor_to_wheel_mapping(self, sensor_index):
@@ -259,7 +301,8 @@ class Animat:
         """Calculate the fitness of this animat based on battery levels.
         
         Returns:
-            Fitness score
+            Fitness score (normalized according to paper, 0-1 range)
         """
-        # F = (B1 + B2) / 2
-        return (self.batteries[0] + self.batteries[1]) / 2.0 
+        # F = (B1 + B2) / (2 * BATTERY_MAX) to align with paper's F = (B1 + B2)/400.0
+        # where BATTERY_MAX from paper is 200.
+        return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)

@@ -161,7 +161,7 @@ class GeneticAlgorithm:
         """
         return self.best_genome, self.best_fitness
         
-def simulate_animat(genome, max_steps=5000):
+def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN):
     """Simulate an animat with the given genome to evaluate fitness.
     
     Args:

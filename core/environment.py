@@ -36,17 +36,17 @@ class Entity:
 class FoodSource(Entity):
     """Food source that restores battery 1."""
     def __init__(self, position):
-        super().__init__(position, EntityType.FOOD, radius=5)
+        super().__init__(position, EntityType.FOOD, radius=settings.SOURCE_SIZE)
 
 class WaterSource(Entity):
     """Water source that restores battery 2."""
     def __init__(self, position):
-        super().__init__(position, EntityType.WATER, radius=5)
+        super().__init__(position, EntityType.WATER, radius=settings.SOURCE_SIZE)
 
 class Trap(Entity):
     """Trap that kills animats on collision."""
     def __init__(self, position):
-        super().__init__(position, EntityType.TRAP, radius=5)
+        super().__init__(position, EntityType.TRAP, radius=settings.SOURCE_SIZE)
 
 class Environment:
     """The 2D environment containing all entities."""

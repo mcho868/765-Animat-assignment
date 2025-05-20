@@ -326,7 +326,7 @@ class Simulator:
                 self.simulation_time = 0
                 last_time = time.time()
                 steps = 0
-                max_steps = 5000  # Same as in simulate_animat function
+                max_steps = settings.ANIMAT_MAX_LIFESPAN
                 
                 # Display which batch is being simulated
                 title_text = f"{settings.WINDOW_TITLE} - Gen {gen+1}/{num_generations}, Batch {batch+1}/{num_batches}"

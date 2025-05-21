@@ -404,7 +404,7 @@ class Simulator:
                     self.screen.blit(step_text, (self.width - 300, 30))
                     
                     # Update the display
-                    pygame.display.flip()
+                    #pygame.display.flip()
                     
                     # Calculate delay based on speed multiplier (lower = faster)
                     delay = max(1, int(10 / speed_multiplier))

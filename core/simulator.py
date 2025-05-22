@@ -210,7 +210,7 @@ class Simulator:
         # Draw section border for clarity
         pygame.draw.rect(self.screen, (200, 200, 200), (x, y, width, height), 1)
         
-    def run_evolution(self,
+    def s(self,
                        num_generations=settings.NUM_GENERATIONS, 
                        parallel_count=1, speed_multiplier=1.0):
         """Run the evolutionary algorithm.

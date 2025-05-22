@@ -210,7 +210,9 @@ class Simulator:
         # Draw section border for clarity
         pygame.draw.rect(self.screen, (200, 200, 200), (x, y, width, height), 1)
         
-    def run_evolution(self, num_generations=settings.NUM_GENERATIONS):
+    def run_evolution(self,
+                       num_generations=settings.NUM_GENERATIONS, 
+                       parallel_count=1, speed_multiplier=1.0):
         """Run the evolutionary algorithm.
         
         Args:
@@ -219,38 +221,139 @@ class Simulator:
         Returns:
             Tuple of (best_genome, best_fitness)
         """
+
+        #keep track of original headless 
+        old_headless = self.headless
+
         self.initialize_ga()
         
+
         for gen in range(num_generations):
             self.generation = gen
+
             print(f"Generation {gen+1}/{num_generations}")
             
-            # Evaluate fitness
-            self.ga.evaluate_fitness(simulate_animat)
+            # Process animats in parallel batches
+            batch_size = min(parallel_count, settings.POPULATION_SIZE)
+            num_batches = (settings.POPULATION_SIZE + batch_size - 1) // batch_size
             
+            fitnesses = []
+            best_fitness = 0.0
+            best_genome = None
+            
+            for batch in range(num_batches):
+                start_idx = batch * batch_size
+                end_idx = min((batch + 1) * batch_size, settings.POPULATION_SIZE)
+                batch_genomes = self.ga.population[start_idx:end_idx]
+                
+                print(f"  Processing batch {batch+1}/{num_batches} (animats {start_idx+1}-{end_idx})")
+                
+                # Create environments and animats for this batch
+                environments ,animats = [],[]
+                
+                for genome in batch_genomes:
+                    # Create a new environment for each animat
+                    env = Environment()
+                    env.initialize_random_environment()
+                    
+                    # Create animat with the genome
+                    center_pos = (env.width/2, env.height/2)
+                    animat = Animat(center_pos, genome)
+                    env.add_entity(animat)
+                    
+                    environments.append(env)
+                    animats.append(animat)
+                
+                # Run simulation loop 
+                self.is_running = True
+                self.simulation_time = 0
+                last_time = time.time()
+                steps = 0
+                max_steps = settings.ANIMAT_MAX_LIFESPAN
+                
+                # Track which animats are still active
+                active_animats = [True] * len(animats)
+                any_active = True
+                
+                while self.is_running and any_active and steps < max_steps:
+                    # Calculate delta time
+                    current_time = time.time()
+                    dt = min(current_time - last_time, 0.2) * speed_multiplier
+                    last_time = current_time
+                    any_active = False
+
+
+                    for i, (env, animat) in enumerate(zip(environments, animats)):
+                        if not active_animats[i]:
+                            continue
+                            
+                        # Update this environment
+                        env.update(dt)
+                        
+                        # mark inactive animates
+                        if not animat.active:
+                            active_animats[i] = False
+                        else:
+                            any_active = True
+
+                         # log battery & behavior for this animat
+                        
+                        if animat.active:
+                            self.logger.log_battery(
+                                animat_id = start_idx + i,                 
+                                battery1  = float(animat.batteries[0]),    
+                                battery2  = float(animat.batteries[1]),
+                                position  = tuple(map(float, animat.position))
+                            )
+
+                            self.logger.log_behavior(
+                                animat_id    = start_idx + i,
+                                wheel_speeds = list(map(float, animat.wheel_speeds)),
+                                direction    = tuple(map(float, animat.direction))
+                            )   
+
+                        step_increment = max(1, int(speed_multiplier))
+                        steps += step_increment
+
+                        #Collect fitness for this batch 
+                    for i,a in enumerate(animats):
+                        f = a.get_fitness()
+                        fitnesses.append(f)
+                        if f > best_fitness:
+                            best_fitness = f
+                            best_genome = batch_genomes[i].copy() 
+
+                #pad fitness list if population not multiple of batch_size
+            if len(fitnesses) < settings.POPULATION_SIZE:
+                fitnesses += [0.0] * (settings.POPULATION_SIZE - len(fitnesses))
+
             # Log stats
-            fitnesses = self.ga.fitnesses
-            avg_fitness = sum(fitnesses) / len(fitnesses) if fitnesses else 0
-            max_fitness = max(fitnesses) if fitnesses else 0
-            min_fitness = min(fitnesses) if fitnesses else 0
-            
+            avg_fit = sum(fitnesses) / len(fitnesses)
             self.generation_stats['generation'].append(gen)
-            self.generation_stats['max_fitness'].append(max_fitness)
-            self.generation_stats['avg_fitness'].append(avg_fitness)
-            self.generation_stats['min_fitness'].append(min_fitness)
+            self.generation_stats['max_fitness'].append(best_fitness)
+            self.generation_stats['avg_fitness'].append(avg_fit)
+            self.generation_stats['min_fitness'].append(min(fitnesses))
             
-            print(f"  Max Fitness: {max_fitness:.2f}")
-            print(f"  Avg Fitness: {avg_fitness:.2f}")
-            print(f"  Min Fitness: {min_fitness:.2f}")
+            print(f"  Max Fitness: {best_fitness:.2f}")
+            print(f"  Avg Fitness: {avg_fit:.2f}")
+            print(f"  Min Fitness: {min(fitnesses):.2f}")
             
-            self.logger.log_generation(gen, fitnesses, self.ga.best_genome, avg_fitness)
+            self.logger.log_generation(gen, fitnesses, best_genome, avg_fit)
+            
+            # Update GA's best genome
+            if best_genome is not None and (self.ga.best_genome is None or best_fitness > self.ga.best_fitness):
+                self.ga.best_genome = best_genome.copy()
+                self.ga.best_fitness = best_fitness
             
             # Evolve next generation (except for last generation)
             if gen < num_generations - 1:
                 self.ga.evolve_generation()
                 
-        # Return the best genome
-        return self.ga.get_best_genome()
+        # Restore headless setting
+        self.headless = old_headless
+        # return self.ga.get_best_genome()
+        return self.ga.get_best_genome(), self.ga.best_fitness
+
         
     def run_evolution_with_visualization(self, num_generations=settings.NUM_GENERATIONS, parallel_count=1, speed_multiplier=1.0):
         """Run the evolutionary algorithm with visualization.
@@ -264,6 +367,7 @@ class Simulator:
             Tuple of (best_genome, best_fitness)
         """
         self.initialize_ga()
+        
         
         # Ensure visualization is enabled
         old_headless = self.headless
@@ -326,7 +430,7 @@ class Simulator:
                 self.simulation_time = 0
                 last_time = time.time()
                 steps = 0
-                max_steps = 5000  # Same as in simulate_animat function
+                max_steps = settings.ANIMAT_MAX_LIFESPAN
                 
                 # Display which batch is being simulated
                 title_text = f"{settings.WINDOW_TITLE} - Gen {gen+1}/{num_generations}, Batch {batch+1}/{num_batches}"
@@ -371,7 +475,20 @@ class Simulator:
                             active_animats[i] = False
                         else:
                             any_active = True
-                            
+                        
+                        if animat.active:    
+                            self.logger.log_battery(
+                                animat_id = start_idx + i,                 
+                                battery1  = float(animat.batteries[0]),    
+                                battery2  = float(animat.batteries[1]),
+                                position  = tuple(map(float, animat.position))
+                            )
+                            self.logger.log_behavior(
+                                animat_id    = start_idx + i,
+                                wheel_speeds = list(map(float, animat.wheel_speeds)),
+                                direction    = tuple(map(float, animat.direction))
+                            )   
+
                         # Calculate the grid layout dimensions
                         grid_cols = int(np.ceil(np.sqrt(batch_size)))
                         grid_rows = int(np.ceil(batch_size / grid_cols))
@@ -454,7 +571,7 @@ class Simulator:
                 
         # Restore headless setting
         self.headless = old_headless
-        
+        # self.logger.finalize()
         # Return the best genome
         return self.ga.get_best_genome()
         

@@ -43,6 +43,7 @@ class GeneticAlgorithm:
         Args:
             simulate_function: Function that takes a genome and returns its fitness
         """
+        
         self.fitnesses = []
         
         for genome in self.population:
@@ -164,7 +165,7 @@ class GeneticAlgorithm:
         """
         return self.best_genome, self.best_fitness
         
-def simulate_animat(genome, max_steps=max_steps):
+def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN,):
     """Simulate an animat with the given genome to evaluate fitness.
     
     Args:
@@ -186,7 +187,10 @@ def simulate_animat(genome, max_steps=max_steps):
     step = 0
     while animat.active and step < max_steps:
         env.update(0.1)  # 0.1 seconds per step
+        # if logger: 
+        #     logger.log
         step += 1
+
         
     # Calculate fitness
     return animat.get_fitness() 

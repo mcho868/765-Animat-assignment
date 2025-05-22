@@ -91,7 +91,7 @@ def main():
             if args.run_best:
                 print("Running simulation with best evolved animat")
                 simulator.run_best_animat(best_genome, max_time=60, speed_multiplier=args.speed_multiplier)
-    except Exception as e:           # ← 指定 Exception 并打印 traceback
+    except Exception as e:         
         import traceback
         traceback.print_exc()
         raise

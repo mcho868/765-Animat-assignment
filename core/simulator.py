@@ -221,7 +221,7 @@ class Simulator:
         Returns:
             Tuple of (best_genome, best_fitness)
         """
-
+        print("evo")
         #keep track of original headless 
         old_headless = self.headless
 
@@ -368,7 +368,7 @@ class Simulator:
         """
         self.initialize_ga()
         
-        
+        print("evo1")
         # Ensure visualization is enabled
         old_headless = self.headless
         self.headless = False

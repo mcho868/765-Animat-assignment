@@ -67,10 +67,11 @@ class Simulator:
         
         # Statistics for plotting
         self.generation_stats = {
-            'generation': [],
-            'max_fitness': [],
-            'avg_fitness': [],
-            'min_fitness': []
+            'generation': []
+            ,'max_fitness': []
+            ,'avg_fitness': []
+            ,'min_fitness': []
+            ,'best_of_gen':[]
         }
         
     def initialize_ga(self):
@@ -221,7 +222,7 @@ class Simulator:
         Returns:
             Tuple of (best_genome, best_fitness)
         """
-        print("evo")
+        
         #keep track of original headless 
         old_headless = self.headless
 
@@ -246,7 +247,7 @@ class Simulator:
                 end_idx = min((batch + 1) * batch_size, settings.POPULATION_SIZE)
                 batch_genomes = self.ga.population[start_idx:end_idx]
                 
-                print(f"  Processing batch {batch+1}/{num_batches} (animats {start_idx+1}-{end_idx})")
+                # print(f"  Processing batch {batch+1}/{num_batches} (animats {start_idx+1}-{end_idx})")
                 
                 # Create environments and animats for this batch
                 environments ,animats = [],[]
@@ -315,13 +316,13 @@ class Simulator:
                         step_increment = max(1, int(speed_multiplier))
                         steps += step_increment
 
-                        #Collect fitness for this batch 
-                    for i,a in enumerate(animats):
-                        f = a.get_fitness()
-                        fitnesses.append(f)
-                        if f > best_fitness:
-                            best_fitness = f
-                            best_genome = batch_genomes[i].copy() 
+                #Collect fitness after this batch 
+                for i,a in enumerate(animats):
+                    f = a.get_fitness()
+                    fitnesses.append(f)
+                    if f > best_fitness:
+                        best_fitness = f
+                        best_genome = batch_genomes[i].copy() 
 
                 #pad fitness list if population not multiple of batch_size
             if len(fitnesses) < settings.POPULATION_SIZE:
@@ -329,15 +330,20 @@ class Simulator:
 
             # Log stats
             avg_fit = sum(fitnesses) / len(fitnesses)
+            best_of_gen = max(fitnesses) if fitnesses else 0
+
             self.generation_stats['generation'].append(gen)
             self.generation_stats['max_fitness'].append(best_fitness)
             self.generation_stats['avg_fitness'].append(avg_fit)
             self.generation_stats['min_fitness'].append(min(fitnesses))
-            
-            print(f"  Max Fitness: {best_fitness:.2f}")
+            self.generation_stats['best_of_gen'].append(best_of_gen)
+
+            # print(f"  Max Fitness: {best_fitness:.2f}")
             print(f"  Avg Fitness: {avg_fit:.2f}")
             print(f"  Min Fitness: {min(fitnesses):.2f}")
+            print(f"  Best of gen: {best_of_gen:.2f}")
             
+
             self.logger.log_generation(gen, fitnesses, best_genome, avg_fit)
             
             # Update GA's best genome
@@ -636,9 +642,19 @@ class Simulator:
     
     def plot_stats(self):
         """Plot the evolution statistics."""
+        gens = self.generation_stats['generation']
+        best_gen = np.array(self.generation_stats['best_of_gen'])
+        best_so_far = np.maximum.accumulate(best_gen)
+
         plt.figure(figsize=(10, 6))
         
-        plt.plot(self.generation_stats['generation'], self.generation_stats['max_fitness'], label='Max Fitness')
+        #step plot, illustrate best in each gen
+        plt.step(gens, best_so_far, where='post', linewidth=2,
+                 label="Best So Far")
+        # current best gen
+        plt.plot(gens, best_gen, '-.', alpha=.6, label="Best Gen")
+
+        # plt.plot(self.generation_stats['generation'], self.generation_stats['max_fitness'], label='Max Fitness')
         plt.plot(self.generation_stats['generation'], self.generation_stats['avg_fitness'], label='Avg Fitness')
         plt.plot(self.generation_stats['generation'], self.generation_stats['min_fitness'], label='Min Fitness')
         

@@ -7,6 +7,9 @@ from config import settings
 from agents.base_agent import Animat
 from core.environment import Environment
 
+global  max_steps 
+max_steps = 5000
+
 class GeneticAlgorithm:
     """Genetic algorithm for evolving animat genomes."""
     
@@ -40,6 +43,7 @@ class GeneticAlgorithm:
         Args:
             simulate_function: Function that takes a genome and returns its fitness
         """
+        
         self.fitnesses = []
         
         for genome in self.population:
@@ -161,7 +165,7 @@ class GeneticAlgorithm:
         """
         return self.best_genome, self.best_fitness
         
-def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN):
+def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN,):
     """Simulate an animat with the given genome to evaluate fitness.
     
     Args:
@@ -183,7 +187,10 @@ def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN):
     step = 0
     while animat.active and step < max_steps:
         env.update(0.1)  # 0.1 seconds per step
+        # if logger: 
+        #     logger.log
         step += 1
+
         
     # Calculate fitness
     return animat.get_fitness() 

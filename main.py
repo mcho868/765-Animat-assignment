@@ -39,59 +39,67 @@ def parse_arguments():
 def main():
     """Main function to set up and run the simulation."""
     # Parse command line arguments
-    args = parse_arguments()
-    
-    # Set up random seed for reproducibility
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-    
-    # Override settings with command line arguments
-    settings.HEADLESS_MODE = args.headless
-    settings.POPULATION_SIZE = args.population
-    settings.NUM_GENERATIONS = args.generations
-    
-    # Create simulator
-    simulator = Simulator(headless=settings.HEADLESS_MODE)
-    
-    if args.visualize_only:
-        # Just visualize a random animat
-        simulator.environment.initialize_random_environment()
+    try:
+        args = parse_arguments()
         
-        # Create and add a random animat
-        from agents.base_agent import Animat
-        center_pos = (simulator.environment.width/2, simulator.environment.height/2)
-        animat = Animat(center_pos)
-        simulator.environment.add_entity(animat)
+        # Set up random seed for reproducibility
+        if args.seed is not None:
+            random.seed(args.seed)
+            np.random.seed(args.seed)
         
-        # Run visualization
-        print("Running visualization with a random animat")
-        simulator.run_best_animat(animat.genome, max_time=60, speed_multiplier=args.speed_multiplier)
+        # Override settings with command line arguments
+        settings.HEADLESS_MODE = args.headless
+        settings.POPULATION_SIZE = args.population
+        settings.NUM_GENERATIONS = args.generations
         
-    else:
-        # Run evolution
-        print(f"Starting evolution with population size {settings.POPULATION_SIZE} "
-              f"for {settings.NUM_GENERATIONS} generations")
+        # Create simulator
+        simulator = Simulator(headless=settings.HEADLESS_MODE)
         
-        if args.visualize_evolution:
-            print(f"Visualizing evolution in progress with {args.parallel_viz} parallel animats (speed: {args.speed_multiplier}x)")
-            best_genome, best_fitness = simulator.run_evolution_with_visualization(
-                args.generations, parallel_count=args.parallel_viz, speed_multiplier=args.speed_multiplier)
+        if args.visualize_only:
+            # Just visualize a random animat
+            simulator.environment.initialize_random_environment()
+            
+            # Create and add a random animat
+            from agents.base_agent import Animat
+            center_pos = (simulator.environment.width/2, simulator.environment.height/2)
+            animat = Animat(center_pos)
+            simulator.environment.add_entity(animat)
+            
+            # Run visualization
+            print("Running visualization with a random animat")
+            simulator.run_evolution_with_visualization()
+            # simulator.run_best_animat(animat.genome, max_time=60, speed_multiplier=args.speed_multiplier)
+            
         else:
-            best_genome, best_fitness = simulator.run_evolution(args.generations)
-        
-        print(f"Evolution complete! Best fitness: {best_fitness:.2f}")
-        
-        # Plot statistics
-        simulator.plot_stats()
-        
-        # Run simulation with best genome if requested
-        if args.run_best:
-            print("Running simulation with best evolved animat")
-            simulator.run_best_animat(best_genome, max_time=60, speed_multiplier=args.speed_multiplier)
-    
+            # Run evolution
+            print(f"Starting evolution with population size {settings.POPULATION_SIZE} "
+                f"for {settings.NUM_GENERATIONS} generations")
+            
+            if args.visualize_evolution:
+                print(f"Visualizing evolution in progress with {args.parallel_viz} parallel animats (speed: {args.speed_multiplier}x)")
+                best_genome, best_fitness = simulator.run_evolution_with_visualization(
+                    args.generations, parallel_count=args.parallel_viz, speed_multiplier=args.speed_multiplier)
+            else:
+                best_genome, best_fitness = simulator.run_evolution(args.generations)
+            
+            print(f"Evolution complete! Best fitness: {best_fitness:.2f}")
+            
+            # Plot statistics
+            simulator.plot_stats()
+            
+            # Run simulation with best genome if requested
+            if args.run_best:
+                print("Running simulation with best evolved animat")
+                simulator.run_best_animat(best_genome, max_time=60, speed_multiplier=args.speed_multiplier)
+    except Exception as e:         
+        import traceback
+        traceback.print_exc()
+        raise
     # Clean up
-    simulator.cleanup()
+    finally:
+        if 'simulator' in locals():
+            simulator.logger.finalize()
+            simulator.cleanup()
     
 if __name__ == "__main__":
     main() 

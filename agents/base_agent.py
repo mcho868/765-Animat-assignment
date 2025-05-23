@@ -4,6 +4,8 @@ Base Animat class with sensors, wheels, and sensorimotor links.
 import numpy as np
 from config import settings
 from core.environment import EntityType
+from utils.logger import Logger
+
 
 class Animat:
     """
@@ -84,7 +86,7 @@ class Animat:
     def parse_genome(self):
         """Parse the genome into sensorimotor links according to paper's specification."""
         self.links = []
-        
+        self.logger = Logger()
         # Process each link's parameters
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
             # Scale offset (0-99 to -100 to +100)
@@ -126,12 +128,15 @@ class Animat:
                 'offset_mod': offset_mod_val,
                 'battery': battery_val,
             }
-            print(f"Link Parameters:")
-            print(f"  Offset: {link_params['offset']:.2f}")
-            print(f"  Gradients: {link_params['grad1']:.2f}, {link_params['grad2']:.2f}, {link_params['grad3']:.2f}")
-            print(f"  Thresholds: {link_params['thresh1']:.2f}, {link_params['thresh2']:.2f}")
-            print(f"  Modulations: slope={link_params['slope_mod']:.2f}, offset={link_params['offset_mod']:.2f}")
-            print(f"  Battery: {link_params['battery']}")
+
+            #Persent in agent logs
+            self.logger.log_agent(link_param = link_params)
+            # print(f"Link Parameters:")
+            # print(f"  Offset: {link_params['offset']:.2f}")
+            # print(f"  Gradients: {link_params['grad1']:.2f}, {link_params['grad2']:.2f}, {link_params['grad3']:.2f}")
+            # print(f"  Thresholds: {link_params['thresh1']:.2f}, {link_params['thresh2']:.2f}")
+            # print(f"  Modulations: slope={link_params['slope_mod']:.2f}, offset={link_params['offset_mod']:.2f}")
+            # print(f"  Battery: {link_params['battery']}")
             self.links.append(link_params)
             
     def get_sensor_to_wheel_mapping(self, sensor_index):

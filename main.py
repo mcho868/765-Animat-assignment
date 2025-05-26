@@ -74,4 +74,6 @@ def main():
     simulator.cleanup()
     
 if __name__ == "__main__":
-    main() 
+    main()
+
+# To run with visualization: python main.py --visualize-evolution

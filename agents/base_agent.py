@@ -4,6 +4,8 @@ Base Animat class with sensors, wheels, and sensorimotor links.
 import numpy as np
 from config import settings
 from core.environment import EntityType
+from utils.logger import Logger
+
 
 class Animat:
     """
@@ -68,7 +70,11 @@ class Animat:
         self.parse_genome()
         
     def initialize_random_genome(self):
-        """Initialize a random genome for the animat."""
+        """Initialize a random genome for the animat.
+        
+        Only 9 links are genetically specified due to left-right symmetry.
+        The genome encodes links for left-side sensors, and right-side links are mirrored.
+        """
         # Genome format (per link):
         # [offset, grad1, thresh1, grad2, thresh2, grad3, slope_mod, offset_mod, battery]
         # Final 2 genes are sigmoid thresholds for wheels
@@ -76,15 +82,20 @@ class Animat:
         genome_size = settings.GENOTYPE_SIZE
         self.genome = np.random.randint(0, 100, genome_size)
         
-        # Set battery indicators (even=battery1, odd=battery2)
+        # Set battery indicators for the 9 encoded links (even=battery1, odd=battery2)
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
             # Every 9th gene indicates battery
             self.genome[i + 8] = np.random.choice([0, 1])  # 0 for battery 1, 1 for battery 2
             
     def parse_genome(self):
-        """Parse the genome into sensorimotor links according to paper's specification."""
-        self.links = []
+        """Parse the genome into sensorimotor links with left-right symmetry enforcement.
         
+        The genome encodes 9 links which are then mirrored to create 18 total links.
+        Links 0,2,4 (left sensors) are encoded, and links 1,3,5 (right sensors) mirror them.
+        """
+        self.links = []
+        self.logger = Logger()
+        encoded_links = []
         # Process each link's parameters
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
             # Scale offset (0-99 to -100 to +100)
@@ -92,12 +103,14 @@ class Animat:
 
             # Scale gradients (0-99 to -pi/2 to +pi/2, then tan)
             angle1 = (self.genome[i + 1] / 99.0) * np.pi - (np.pi / 2.0)
+            angle1 = np.clip(angle1, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
             grad1_val = np.tan(angle1)
 
             # Scale threshold 1 (0-99 to -100 to +100)
             thresh1_val = self._scale_genome_value(self.genome[i + 2], -100.0, 100.0)
 
             angle2 = (self.genome[i + 3] / 99.0) * np.pi - (np.pi / 2.0)
+            angle2 = np.clip(angle2, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
             grad2_val = np.tan(angle2)
 
             # Scale raw thresh2 value first (0-99 to -100 to +100)
@@ -106,6 +119,7 @@ class Animat:
             thresh2_val = max(thresh1_val, thresh2_raw_scaled)
 
             angle3 = (self.genome[i + 5] / 99.0) * np.pi - (np.pi / 2.0)
+            angle3 = np.clip(angle3, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
             grad3_val = np.tan(angle3)
 
             # Slope and offset modulation degrees (paper does not explicitly scale these beyond being 0-99 derived)
@@ -126,14 +140,26 @@ class Animat:
                 'offset_mod': offset_mod_val,
                 'battery': battery_val,
             }
-            print(f"Link Parameters:")
-            print(f"  Offset: {link_params['offset']:.2f}")
-            print(f"  Gradients: {link_params['grad1']:.2f}, {link_params['grad2']:.2f}, {link_params['grad3']:.2f}")
-            print(f"  Thresholds: {link_params['thresh1']:.2f}, {link_params['thresh2']:.2f}")
-            print(f"  Modulations: slope={link_params['slope_mod']:.2f}, offset={link_params['offset_mod']:.2f}")
-            print(f"  Battery: {link_params['battery']}")
-            self.links.append(link_params)
-            
+            encoded_links.append(link_params)
+            self.logger.log_agent(link_param = link_params)
+
+        
+        # Now create the full 18 links with symmetry
+        # Sensor mapping: 0=food_left, 1=food_right, 2=water_left, 3=water_right, 4=trap_left, 5=trap_right
+        # Each sensor has 3 parallel links, so we have 18 total links
+        
+        # Create links for all 6 sensors (3 links per sensor)
+        for sensor_idx in range(6):
+            for link_offset in range(3):
+                if sensor_idx % 2 == 0:  # Left sensor (0, 2, 4)
+                    # Use encoded link directly
+                    encoded_idx = (sensor_idx // 2) * 3 + link_offset
+                    self.links.append(encoded_links[encoded_idx].copy())
+                else:  # Right sensor (1, 3, 5)
+                    # Mirror the corresponding left sensor link
+                    left_sensor_idx = sensor_idx - 1
+                    encoded_idx = (left_sensor_idx // 2) * 3 + link_offset
+                    self.links.append(encoded_links[encoded_idx].copy())
     def get_sensor_to_wheel_mapping(self, sensor_index):
         """Determine which wheel a sensor connects to based on side.
         
@@ -237,10 +263,9 @@ class Animat:
         Returns:
             Sigmoid activation (-1 to 1)
         """
-        # Adjust threshold to be in a reasonable range
-        scaled_threshold = threshold / 20.0
-        # Sigmoid function that outputs in range [-1, 1]
-        return 2.0 / (1.0 + np.exp(-x * scaled_threshold)) - 1.0
+        # The 'threshold' parameter is already scaled to a range like [-3.0, 3.0] by _scale_sigmoid_genome_value
+        # Using it directly provides a reasonable slope for the sigmoid.
+        return 2.0 / (1.0 + np.exp(-x * threshold)) - 1.0
         
     def update(self, dt, environment):
         """Update the animat's state for one timestep.
@@ -306,3 +331,11 @@ class Animat:
         # F = (B1 + B2) / (2 * BATTERY_MAX) to align with paper's F = (B1 + B2)/400.0
         # where BATTERY_MAX from paper is 200.
         return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)
+
+    def get_forward_speed(self):
+        """
+        Calculates the current forward speed of the animat.
+        This is the average of its two wheel speeds.
+        The wheel speeds themselves are scaled by ANIMAT_MAX_SPEED.
+        """
+        return (self.wheel_speeds[0] + self.wheel_speeds[1]) / 2.0

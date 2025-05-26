@@ -7,6 +7,9 @@ from config import settings
 from agents.base_agent import Animat
 from core.environment import Environment
 
+global  max_steps 
+max_steps = 5000
+
 class GeneticAlgorithm:
     """Genetic algorithm for evolving animat genomes."""
     
@@ -21,6 +24,9 @@ class GeneticAlgorithm:
         self.best_genome = None
         self.best_fitness = 0
         self.generation = 0
+        self.hist_best = []
+        self.hist_best_gen = []
+        self.hist_avg = []
         
     def initialize_population(self):
         """Initialize a random population of genomes."""
@@ -33,14 +39,18 @@ class GeneticAlgorithm:
             self.population.append(animat.genome)
             
         self.fitnesses = [0] * self.population_size
-        
+    
     def evaluate_fitness(self, simulate_function):
         """Evaluate fitness of each genome in the population.
         
         Args:
             simulate_function: Function that takes a genome and returns its fitness
         """
-        self.fitnesses = []
+        
+        self.fitnesses = [
+            simulate_function(genome, env_seed = self.generation) # same env per gen
+            for genome in self.population
+        ]
         
         for genome in self.population:
             fitness = simulate_function(genome)
@@ -51,7 +61,19 @@ class GeneticAlgorithm:
         if self.best_genome is None or self.fitnesses[best_idx] > self.best_fitness:
             self.best_genome = self.population[best_idx].copy()
             self.best_fitness = self.fitnesses[best_idx]
-            
+        
+        best_gen = max(self.fitnesses) #best fit in this gen
+        avg_gen = np.mean(self.fitnesses)#average 
+
+        if not self.hist_best:
+            new_best = best_gen
+        else :
+            new_best = max(self.hist_best[-1], best_gen)
+
+        self.hist_best_gen.append(best_gen)# best fitness in this gen
+        self.hist_best.append(new_best)#best fitness every
+        self.hist_avg.append(avg_gen)#average fitness
+
     def tournament_selection(self):
         """Select a genome using tournament selection.
         
@@ -83,15 +105,11 @@ class GeneticAlgorithm:
             Two child genomes
         """
         if random.random() > self.crossover_rate:
-            return parent1.copy(), parent2.copy()
-            
-        # One-point crossover
-        crossover_point = random.randint(1, len(parent1) - 1)
-        
-        child1 = np.concatenate((parent1[:crossover_point], parent2[crossover_point:]))
-        child2 = np.concatenate((parent2[:crossover_point], parent1[crossover_point:]))
-        
-        return child1, child2
+            cp = random.randint(1, len(parent1) - 1)
+            child1 = np.concatenate((parent1[:cp], parent2[cp:]))
+            child2 = np.concatenate((parent2[:cp], parent1[cp:]))
+            return child1, child2
+        return parent1.copy(), parent2.copy()
         
     def mutate(self, genome):
         """Mutate a genome with the given mutation rate.
@@ -112,9 +130,12 @@ class GeneticAlgorithm:
                     mutated_genome[i] = 1 - mutated_genome[i]  # Flip 0 to 1 or 1 to 0
                 else:
                     # For other genes, add a random value between -10 and 10
-                    mutated_genome[i] += random.randint(-10, 10)
+                    # mutated_genome[i] += random.randint(-10, 10)
+                    # small Gaussion step
+                    mutated_genome[i] += random.randint(0,1)
                     # Keep values in appropriate ranges
-                    mutated_genome[i] = max(-50, min(50, mutated_genome[i]))
+                    # mutated_genome[i] = max(-50, min(50, mutated_genome[i]))
+                    mutated_genome[i] = np.clip(mutated_genome[i], -50,50)
                     
         return mutated_genome
         
@@ -161,7 +182,7 @@ class GeneticAlgorithm:
         """
         return self.best_genome, self.best_fitness
         
-def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN):
+def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN,):
     """Simulate an animat with the given genome to evaluate fitness.
     
     Args:
@@ -182,8 +203,9 @@ def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN):
     # Run simulation
     step = 0
     while animat.active and step < max_steps:
-        env.update(0.1)  # 0.1 seconds per step
+        env.update(0.1)  # Changed from 1 to 0.1 seconds per step
         step += 1
+
         
     # Calculate fitness
     return animat.get_fitness() 

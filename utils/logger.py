@@ -11,29 +11,44 @@ from datetime import datetime
 class Logger:
     """Logger for the animat simulation."""
     
+    def _init_csv(self, path, header):
+        """create file with header if it does not exist or is empty"""
+        need_header = not os.path.exists(path) or os.path.getsize(path) == 0
+        mode = 'a'            # always append
+        with open(path, mode, newline='') as f:
+            writer = csv.writer(f)
+            if need_header:
+                writer.writerow(header)
+
+
     def __init__(self, log_dir="logs"):
         """Initialize logger with a directory for saving logs.
         
         Args:
             log_dir: Directory to save logs in
         """
+        
+
         self.log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
         
-        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.battery_log_file = os.path.join(log_dir, f"battery_log_{self.timestamp}.csv")
-        self.behavior_log_file = os.path.join(log_dir, f"behavior_log_{self.timestamp}.csv")
-        self.simulation_log_file = os.path.join(log_dir, f"simulation_log_{self.timestamp}.json")
         
+
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # self.battery_log_file = os.path.join(log_dir, f"battery_log_{self.timestamp}.csv")
+        self.battery_log_file = os.path.join(log_dir, f"battery_log{self.timestamp}.csv")
+        self.behavior_log_file = os.path.join(log_dir, f"behavior_log{self.timestamp}.csv")
+        self.simulation_log_file = os.path.join(log_dir, f"simulation_log{self.timestamp}.json")
+        self.agent_log_file = os.path.join(log_dir, f"agent_log{self.timestamp}.csv")
         # Initialize CSV files with headers
-        with open(self.battery_log_file, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(["Timestamp", "Animat ID", "Battery1", "Battery2", "Position X", "Position Y"])
-            
-        with open(self.behavior_log_file, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(["Timestamp", "Animat ID", "Left Wheel", "Right Wheel", "Direction X", "Direction Y"])
-            
+        self._init_csv(self.battery_log_file,
+               ["Timestamp", "Animat ID", "Battery1", "Battery2", "Position_x", "Position_y"])
+        self._init_csv(self.behavior_log_file,
+                    ["Timestamp", "Animat ID", "Left Wheel", "Right Wheel", "Direction_x", "Direction_y"])
+        self._init_csv(self.agent_log_file,
+                    ["Offset", "Gradients", "Thresholds", "Modulations", "Battery"])
+        
         self.simulation_data = {
             "start_time": time.time(),
             "settings": {},
@@ -62,10 +77,26 @@ class Logger:
             wheel_speeds: [left_wheel, right_wheel] speeds
             direction: (x, y) direction vector
         """
+        
         with open(self.behavior_log_file, 'a', newline='') as f:
             writer = csv.writer(f)
+            
             writer.writerow([time.time(), animat_id, wheel_speeds[0], wheel_speeds[1], direction[0], direction[1]])
-    
+
+    def log_agent(self, link_param):
+        with open(self.agent_log_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+
+            writer.writerow(
+                            [
+                            link_param['offset'] 
+                            ,link_param['grad1']
+                            ,link_param['thresh1']
+                            ,link_param['slope_mod']
+                            ,link_param['battery']
+                            ]
+                            )
+
     def log_generation(self, generation_num, fitness_scores, best_genome, avg_fitness):
         """Log data about a completed generation in the genetic algorithm.
         
@@ -105,6 +136,8 @@ class Logger:
             "value": value
         })
     
+        
+
     def set_settings(self, settings):
         """Store the simulation settings.
         

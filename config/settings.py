@@ -3,8 +3,8 @@ Configuration settings for the Animat model simulation.
 """
 
 #Window settings
-WINDOW_WIDTH = 2000
-WINDOW_HEIGHT = 1400
+WINDOW_WIDTH = 1000
+WINDOW_HEIGHT = 1000
 WINDOW_TITLE = "Animat Evolution Simulation"
 FPS = 60
 
@@ -20,8 +20,8 @@ ANIMAT_SIZE = 5
 SOURCE_SIZE = 16
 ANIMAT_MAX_SPEED = 2.8
 SENSOR_RANGE = 100
-BATTERY_MAX = 200
-BATTERY_DECAY_RATE = 1  # Decay per second. With dt=0.1, this is 1 unit per timestep
+BATTERY_MAX = 200  # Paper specifies maximum and initial level of 200
+BATTERY_DECAY_RATE = 1.0  # Paper specifies decreases by 1 each time step
 ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 
 #Genetic algorithm settings
@@ -33,8 +33,8 @@ TOURNAMENT_SIZE = 2
 
 #Sensorimotor link settings
 LINK_PARAM_COUNT = 9
-NUM_LINKS = 18  # 3 sensors * 2 sides * 3 parallel links
-GENOTYPE_SIZE = NUM_LINKS * LINK_PARAM_COUNT + 2  # +2 for sigmoid thresholds
+NUM_LINKS = 9  # Only 9 links need to be genetically specified due to left-right symmetry
+GENOTYPE_SIZE = NUM_LINKS * LINK_PARAM_COUNT + 2  # 9*9 + 2 = 83 total integers
 
 #Simulation mode
 HEADLESS_MODE = True  # Set to True to run simulations without visualization

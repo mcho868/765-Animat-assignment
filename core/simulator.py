@@ -72,6 +72,7 @@ class Simulator:
             ,'avg_fitness': []
             ,'min_fitness': []
             ,'best_of_gen':[]
+            
         }
         
     def initialize_ga(self):
@@ -551,20 +552,24 @@ class Simulator:
                 fitnesses.append(0)
             
             # Log stats
-            avg_fitness = sum(fitnesses) / len(fitnesses) if fitnesses else 0
+            
+            avg_fit = sum(fitnesses) / len(fitnesses)
+            best_of_gen = max(fitnesses) if fitnesses else 0
             max_fitness = max(fitnesses) if fitnesses else 0
             min_fitness = min(fitnesses) if fitnesses else 0
             
             self.generation_stats['generation'].append(gen)
-            self.generation_stats['max_fitness'].append(max_fitness)
-            self.generation_stats['avg_fitness'].append(avg_fitness)
-            self.generation_stats['min_fitness'].append(min_fitness)
+            self.generation_stats['max_fitness'].append(best_fitness)
+            self.generation_stats['avg_fitness'].append(avg_fit)
+            self.generation_stats['min_fitness'].append(min(fitnesses))
+            self.generation_stats['best_of_gen'].append(best_of_gen)
+
+            # print(f"  Max Fitness: {best_fitness:.2f}")
+            print(f"  Avg Fitness: {avg_fit:.2f}")
+            print(f"  Min Fitness: {min(fitnesses):.2f}")
+            print(f"  Best of gen: {best_of_gen:.2f}")
             
-            print(f"  Max Fitness: {max_fitness:.2f}")
-            print(f"  Avg Fitness: {avg_fitness:.2f}")
-            print(f"  Min Fitness: {min_fitness:.2f}")
-            
-            self.logger.log_generation(gen, fitnesses, best_genome, avg_fitness)
+            self.logger.log_generation(gen, fitnesses, best_genome, avg_fit)
             
             # Update GA's best genome
             if best_genome is not None and (self.ga.best_genome is None or best_fitness > self.ga.best_fitness):
@@ -641,34 +646,37 @@ class Simulator:
                 self.clock.tick(self.fps)
     
     def plot_stats(self):
-        """Plot the evolution statistics."""
         gens = self.generation_stats['generation']
-        best_gen = np.array(self.generation_stats['best_of_gen'])
-        best_so_far = np.maximum.accumulate(best_gen)
+        best_of_gens = np.array(self.generation_stats['best_of_gen'])
+
+        if len(best_of_gens) == 0:          # 防止再次为空
+            print("No data to plot — best_of_gen is empty.")
+            return
+
+        # running-max 做阶梯
+        best_so_far = np.maximum.accumulate(best_of_gens)
 
         plt.figure(figsize=(10, 6))
-        
-        #step plot, illustrate best in each gen
         plt.step(gens, best_so_far, where='post', linewidth=2,
-                 label="Best So Far")
-        # current best gen
-        plt.plot(gens, best_gen, '-.', alpha=.6, label="Best Gen")
+                label='Best so-far (阶梯)')
+        plt.plot(gens, best_of_gens, '--', alpha=.6,
+                label='Best / generation')
 
-        # plt.plot(self.generation_stats['generation'], self.generation_stats['max_fitness'], label='Max Fitness')
-        plt.plot(self.generation_stats['generation'], self.generation_stats['avg_fitness'], label='Avg Fitness')
-        plt.plot(self.generation_stats['generation'], self.generation_stats['min_fitness'], label='Min Fitness')
-        
+        plt.plot(gens, self.generation_stats['avg_fitness'], label='Avg Fitness')
+        plt.plot(gens, self.generation_stats['min_fitness'], label='Min Fitness')
+
         plt.title('Evolution Progress')
         plt.xlabel('Generation')
         plt.ylabel('Fitness')
-        plt.grid(True)
+        plt.grid(True, alpha=.3)
         plt.legend()
-        
+        plt.tight_layout()
         plt.savefig('evolution_stats.png')
         print("Evolution statistics saved to evolution_stats.png")
-        
+
         if not self.headless:
             plt.show()
+
         
     def cleanup(self):
         """Clean up resources."""

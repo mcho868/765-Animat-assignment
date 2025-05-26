@@ -1,0 +1,25 @@
+---
+title: '765'
+author: "Shuo Mao 437681258"
+date: "2025-05-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(parallel)
+library(iotools)
+```
+
+
+# Loading robots logs
+```{r}
+
+csv_files <- list.files(
+  path    = "logs/",            # directory containing the files
+  pattern = "^battery_log[0-9]+_[0-9]+\\.csv$",
+  full.names = TRUE
+)
+
+
+```

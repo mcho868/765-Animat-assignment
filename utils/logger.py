@@ -37,10 +37,10 @@ class Logger:
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # self.battery_log_file = os.path.join(log_dir, f"battery_log_{self.timestamp}.csv")
-        self.battery_log_file = os.path.join(log_dir, f"battery_log.csv")
-        self.behavior_log_file = os.path.join(log_dir, f"behavior_log.csv")
+        self.battery_log_file = os.path.join(log_dir, f"battery_log{self.timestamp}.csv")
+        self.behavior_log_file = os.path.join(log_dir, f"behavior_log{self.timestamp}.csv")
         self.simulation_log_file = os.path.join(log_dir, f"simulation_log{self.timestamp}.json")
-        self.agent_log_file = os.path.join(log_dir, f"agent_log.csv")
+        self.agent_log_file = os.path.join(log_dir, f"agent_log{self.timestamp}.csv")
         # Initialize CSV files with headers
         self._init_csv(self.battery_log_file,
                ["Timestamp", "Animat ID", "Battery1", "Battery2", "Position X", "Position Y"])

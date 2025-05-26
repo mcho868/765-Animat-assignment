@@ -188,21 +188,21 @@ class Environment:
             # Apply to the appropriate sensor based on entity type and side
             if entity.type == EntityType.FOOD:
                 if left_dot > 0:
-                    readings['food_left'] = max(readings['food_left'], sensor_value * left_dot)
+                    readings['food_left'] = max(readings['food_left'], sensor_value * 1.2 * left_dot)
                 if right_dot > 0:
-                    readings['food_right'] = max(readings['food_right'], sensor_value * right_dot)
+                    readings['food_right'] = max(readings['food_right'], sensor_value * 1.2 * right_dot)
             
             elif entity.type == EntityType.WATER:
                 if left_dot > 0:
-                    readings['water_left'] = max(readings['water_left'], sensor_value * left_dot)
+                    readings['water_left'] = max(readings['water_left'], sensor_value * 1.2 * left_dot)
                 if right_dot > 0:
-                    readings['water_right'] = max(readings['water_right'], sensor_value * right_dot)
+                    readings['water_right'] = max(readings['water_right'], sensor_value * 1.2 * right_dot)
             
             elif entity.type == EntityType.TRAP:
                 if left_dot > 0:
-                    readings['trap_left'] = max(readings['trap_left'], sensor_value * left_dot)
+                    readings['trap_left'] = max(readings['trap_left'], sensor_value * 1.2 * left_dot)
                 if right_dot > 0:
-                    readings['trap_right'] = max(readings['trap_right'], sensor_value * right_dot)
+                    readings['trap_right'] = max(readings['trap_right'], sensor_value * 1.2 * right_dot)
         
         return readings
     

@@ -203,9 +203,7 @@ def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN,):
     # Run simulation
     step = 0
     while animat.active and step < max_steps:
-        env.update(0.1)  # 0.1 seconds per step
-        # if logger: 
-        #     logger.log
+        env.update(0.1)  # Changed from 1 to 0.1 seconds per step
         step += 1
 
         

@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from collections import defaultdict
+import math
 
 def parse_arguments():
     """Parse command line arguments."""
@@ -144,6 +145,68 @@ def animate_agent_positions(timestamps, data, output_file="agent_positions.mp4",
     plt.close()
     
     print(f"Saved agent position animation to {output_file}")
+
+class BehaviorMetrics:
+    def __init__(self):
+        self.metrics = {
+            'speed': {
+                'current': 0,
+                'history': [],
+                'to_resources': [],
+                'from_resources': [],
+                'under_competition': []
+            },
+            'resources': {
+                'collected': 0,
+                'attempts': 0,
+                'competitions': 0,
+                'wins': 0
+            },
+            'traps': {
+                'collisions': 0,
+                'near_misses': 0,
+                'safety_margins': []
+            },
+            'battery': {
+                'levels': [],
+                'depletion_rates': [],
+                'recovery_rates': []
+            },
+            'social': {
+                'interactions': 0,
+                'following_events': 0,
+                'territory_changes': []
+            }
+        }
+    
+    def update_speed_metrics(self, left_wheel, right_wheel, has_competition):
+        speed = math.sqrt(left_wheel**2 + right_wheel**2)
+        self.metrics['speed']['current'] = speed
+        self.metrics['speed']['history'].append(speed)
+        if has_competition:
+            self.metrics['speed']['under_competition'].append(speed)
+    
+    def update_resource_metrics(self, collected, competed, won):
+        if collected:
+            self.metrics['resources']['collected'] += 1
+        self.metrics['resources']['attempts'] += 1
+        if competed:
+            self.metrics['resources']['competitions'] += 1
+            if won:
+                self.metrics['resources']['wins'] += 1
+    
+    def calculate_efficiency(self):
+        return {
+            'speed_efficiency': np.mean(self.metrics['speed']['history']),
+            'resource_efficiency': (
+                self.metrics['resources']['collected'] / 
+                self.metrics['resources']['attempts']
+            ),
+            'competition_success': (
+                self.metrics['resources']['wins'] / 
+                self.metrics['resources']['competitions']
+            ) if self.metrics['resources']['competitions'] > 0 else 0
+        }
 
 def main():
     """Main function to visualize stress logs."""

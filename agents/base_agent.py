@@ -237,10 +237,8 @@ class Animat:
         Returns:
             Sigmoid activation (-1 to 1)
         """
-        # Adjust threshold to be in a reasonable range
-        scaled_threshold = threshold / 20.0
         # Sigmoid function that outputs in range [-1, 1]
-        return 2.0 / (1.0 + np.exp(-x * scaled_threshold)) - 1.0
+        return 2.0 / (1.0 + np.exp(-x * threshold)) - 1.0
         
     def update(self, dt, environment):
         """Update the animat's state for one timestep.

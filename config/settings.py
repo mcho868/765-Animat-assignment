@@ -21,13 +21,13 @@ SOURCE_SIZE = 16
 ANIMAT_MAX_SPEED = 2.8
 SENSOR_RANGE = 100
 BATTERY_MAX = 200
-BATTERY_DECAY_RATE = 100  # Per timestep (adjusted to deplete in 200 steps with dt=0.1)
+BATTERY_DECAY_RATE = 100 # Per timestep (adjusted to deplete in 200 steps with dt=0.1)
 ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 
 #Genetic algorithm settings
 POPULATION_SIZE = 100
-MUTATION_RATE = 0.04  # 4% per bit (Note: current mutation is per-gene)
-CROSSOVER_RATE = 0.5
+MUTATION_RATE = 0.02  # 2% per bit (Note: current mutation is per-gene)
+CROSSOVER_RATE = 0.7 # 70% chance of crossover
 NUM_GENERATIONS = 200
 TOURNAMENT_SIZE = 2
 

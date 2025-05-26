@@ -4,6 +4,8 @@ Base Animat class with sensors, wheels, and sensorimotor links.
 import numpy as np
 from config import settings
 from core.environment import EntityType
+from utils.logger import Logger
+
 
 class Animat:
     """
@@ -92,9 +94,9 @@ class Animat:
         Links 0,2,4 (left sensors) are encoded, and links 1,3,5 (right sensors) mirror them.
         """
         self.links = []
-        
-        # First, parse the 9 encoded links from the genome
+        self.logger = Logger()
         encoded_links = []
+        # Process each link's parameters
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
             # Scale offset (0-99 to -100 to +100)
             offset_val = self._scale_genome_value(self.genome[i], -100.0, 100.0)
@@ -139,6 +141,8 @@ class Animat:
                 'battery': battery_val,
             }
             encoded_links.append(link_params)
+            self.logger.log_agent(link_param = link_params)
+
         
         # Now create the full 18 links with symmetry
         # Sensor mapping: 0=food_left, 1=food_right, 2=water_left, 3=water_right, 4=trap_left, 5=trap_right

@@ -72,6 +72,7 @@ class Simulator:
             'avg_fitness': [],
             'min_fitness': []
         }
+        self.trajectory_to_draw = [] # For drawing agent trajectory
         
     def initialize_ga(self):
         """Initialize the genetic algorithm."""
@@ -115,6 +116,15 @@ class Simulator:
         scale_x = self.width / self.environment.width
         scale_y = self.height / self.environment.height
         
+        # Draw trajectory if available
+        if len(self.trajectory_to_draw) >= 2:
+            scaled_points = []
+            for point in self.trajectory_to_draw:
+                screen_px = int(point[0] * scale_x)
+                screen_py = int(point[1] * scale_y)
+                scaled_points.append((screen_px, screen_py))
+            pygame.draw.lines(self.screen, (180, 180, 180), False, scaled_points, 2) # Light grey color, 2 pixels thick
+        
         # Render entities
         for entity in self.environment.entities:
             if not entity.active:
@@ -152,6 +162,12 @@ class Simulator:
                 battery2_percent = int((entity.batteries[1] / settings.BATTERY_MAX) * 100)
                 battery_text = self.font.render(f"L:{battery1_percent}% R:{battery2_percent}%", True, (0, 0, 0))
                 self.screen.blit(battery_text, (screen_x + 10, screen_y - entity.radius - 10))
+                
+                # Display animat speed directly below the animat in the main render view
+                forward_speed = entity.get_forward_speed()
+                speed_text_surface = self.font.render(f"Speed: {forward_speed:.2f}", True, (0, 0, 0))
+                text_width = speed_text_surface.get_width()
+                self.screen.blit(speed_text_surface, (screen_x - text_width // 2, screen_y + screen_radius + 5))
         
         # Draw performance stats
         fps_text = self.font.render(f"FPS: {int(self.clock.get_fps())}", True, (0, 0, 0))
@@ -236,55 +252,14 @@ class Simulator:
                 battery_text = self.font.render(f"L:{battery1_percent}% R:{battery2_percent}%", True, (0, 0, 0))
                 self.screen.blit(battery_text, (screen_x + 10, screen_y - entity.radius - 10))
                 
-                # Draw speed for this animat
+                # Display animat speed directly below the animat in the main render view
                 forward_speed = entity.get_forward_speed()
-                speed_text = self.font.render(f"Speed: {forward_speed:.2f}", True, (0, 0, 0))
-                self.screen.blit(speed_text, (screen_x - 10, screen_y + entity.radius + 5))
+                speed_text_surface = self.font.render(f"Speed: {forward_speed:.2f}", True, (0, 0, 0))
+                text_width = speed_text_surface.get_width()
+                self.screen.blit(speed_text_surface, (screen_x - text_width // 2, screen_y + screen_radius + 5))
         
         # Draw section border for clarity
         pygame.draw.rect(self.screen, (200, 200, 200), (x, y, width, height), 1)
-        
-    def run_evolution(self, num_generations=settings.NUM_GENERATIONS):
-        """Run the evolutionary algorithm.
-        
-        Args:
-            num_generations: Number of generations to evolve
-            
-        Returns:
-            Tuple of (best_genome, best_fitness)
-        """
-        self.initialize_ga()
-        
-        for gen in range(num_generations):
-            self.generation = gen
-            print(f"Generation {gen+1}/{num_generations}")
-            
-            # Evaluate fitness
-            self.ga.evaluate_fitness(simulate_animat)
-            
-            # Log stats
-            fitnesses = self.ga.fitnesses
-            avg_fitness = sum(fitnesses) / len(fitnesses) if fitnesses else 0
-            max_fitness = max(fitnesses) if fitnesses else 0
-            min_fitness = min(fitnesses) if fitnesses else 0
-            
-            self.generation_stats['generation'].append(gen)
-            self.generation_stats['max_fitness'].append(max_fitness)
-            self.generation_stats['avg_fitness'].append(avg_fitness)
-            self.generation_stats['min_fitness'].append(min_fitness)
-            
-            print(f"  Max Fitness: {max_fitness:.2f}")
-            print(f"  Avg Fitness: {avg_fitness:.2f}")
-            print(f"  Min Fitness: {min_fitness:.2f}")
-            
-            self.logger.log_generation(gen, fitnesses, self.ga.best_genome, avg_fitness)
-            
-            # Evolve next generation (except for last generation)
-            if gen < num_generations - 1:
-                self.ga.evolve_generation()
-                
-        # Return the best genome
-        return self.ga.get_best_genome()
         
     def run_evolution_with_visualization(self, num_generations=settings.NUM_GENERATIONS, parallel_count=1, speed_multiplier=1.0):
         """Run the evolutionary algorithm with visualization.
@@ -529,6 +504,8 @@ class Simulator:
         self.is_running = True
         self.simulation_time = 0
         last_time = time.time()
+        self.trajectory_to_draw = [] # Clear previous trajectory
+        MAX_TRAJECTORY_POINTS = 500 # Max points to store for trajectory
         
         while self.is_running:
             # Calculate delta time
@@ -550,6 +527,12 @@ class Simulator:
             # Update simulation
             self.update(dt)
             
+            # Add current animat position to trajectory
+            if animat.active:
+                if len(self.trajectory_to_draw) >= MAX_TRAJECTORY_POINTS:
+                    self.trajectory_to_draw.pop(0) # Remove oldest point
+                self.trajectory_to_draw.append(tuple(animat.position))
+
             # Render
             self.render()
             

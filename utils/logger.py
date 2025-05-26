@@ -43,9 +43,9 @@ class Logger:
         self.agent_log_file = os.path.join(log_dir, f"agent_log{self.timestamp}.csv")
         # Initialize CSV files with headers
         self._init_csv(self.battery_log_file,
-               ["Timestamp", "Animat ID", "Battery1", "Battery2", "Position X", "Position Y"])
+               ["Timestamp", "Animat ID", "Battery1", "Battery2", "Position_x", "Position_y"])
         self._init_csv(self.behavior_log_file,
-                    ["Timestamp", "Animat ID", "Left Wheel", "Right Wheel", "Direction X", "Direction Y"])
+                    ["Timestamp", "Animat ID", "Left Wheel", "Right Wheel", "Direction_x", "Direction_y"])
         self._init_csv(self.agent_log_file,
                     ["Offset", "Gradients", "Thresholds", "Modulations", "Battery"])
         

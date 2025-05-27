@@ -67,6 +67,8 @@ class Animat:
         # Parse genome into sensorimotor links
         self.parse_genome()
         
+        self.speed_history = []  # Track speed at each timestep
+        
     def initialize_random_genome(self):
         """Initialize a random genome for the animat.
         
@@ -88,12 +90,9 @@ class Animat:
     def parse_genome(self):
         """Parse the genome into sensorimotor links with left-right symmetry enforcement.
         
-        The genome encodes 9 links which are then mirrored to create 18 total links.
-        Links 0,2,4 (left sensors) are encoded, and links 1,3,5 (right sensors) mirror them.
+        The genome encodes links for left-side sensors, and right-side links are mirrored.
         """
         self.links = []
-        
-        # First, parse the 9 encoded links from the genome
         encoded_links = []
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
             # Scale offset (0-99 to -100 to +100)
@@ -140,19 +139,14 @@ class Animat:
             }
             encoded_links.append(link_params)
         
-        # Now create the full 18 links with symmetry
-        # Sensor mapping: 0=food_left, 1=food_right, 2=water_left, 3=water_right, 4=trap_left, 5=trap_right
-        # Each sensor has 3 parallel links, so we have 18 total links
-        
-        # Create links for all 6 sensors (3 links per sensor)
-        for sensor_idx in range(6):
+        # Now create the full links with symmetry
+        num_sensors = settings.NUM_SENSORS
+        for sensor_idx in range(num_sensors):
             for link_offset in range(3):
-                if sensor_idx % 2 == 0:  # Left sensor (0, 2, 4)
-                    # Use encoded link directly
+                if sensor_idx % 2 == 0:  # Left sensor
                     encoded_idx = (sensor_idx // 2) * 3 + link_offset
                     self.links.append(encoded_links[encoded_idx].copy())
-                else:  # Right sensor (1, 3, 5)
-                    # Mirror the corresponding left sensor link
+                else:  # Right sensor
                     left_sensor_idx = sensor_idx - 1
                     encoded_idx = (left_sensor_idx // 2) * 3 + link_offset
                     self.links.append(encoded_links[encoded_idx].copy())
@@ -160,13 +154,11 @@ class Animat:
         """Determine which wheel a sensor connects to based on side.
         
         Args:
-            sensor_index: Index of the sensor (0-5)
+            sensor_index: Index of the sensor (0-7 for multi-animat)
             
         Returns:
             Index of the wheel (0=left, 1=right)
         """
-        # Sensors 0, 2, 4 are on the left, connect to left wheel (0)
-        # Sensors 1, 3, 5 are on the right, connect to right wheel (1)
         return sensor_index % 2
         
     def compute_sensor_to_wheel_output(self, sensor_value, link_index):
@@ -211,28 +203,18 @@ class Animat:
         Returns:
             List of wheel speeds [left_wheel, right_wheel]
         """
-        # Convert sensor readings dict to a list in the expected order
-        sensor_values = [
-            sensor_readings['food_left'],
-            sensor_readings['food_right'],
-            sensor_readings['water_left'],
-            sensor_readings['water_right'],
-            sensor_readings['trap_left'],
-            sensor_readings['trap_right']
-        ]
+        # Build sensor_keys list based on NUM_SENSORS
+        base_keys = ['food_left', 'food_right', 'water_left', 'water_right', 'trap_left', 'trap_right', 'other_left', 'other_right']
+        sensor_keys = base_keys[:settings.NUM_SENSORS]
+        sensor_values = [sensor_readings[k] for k in sensor_keys]
         
         # Reset wheel outputs
         wheel_outputs = [0.0, 0.0]  # [left, right]
         
         # For each sensor and its three corresponding links
         for sensor_idx, sensor_value in enumerate(sensor_values):
-            # Determine which wheel this sensor connects to
             wheel_idx = self.get_sensor_to_wheel_mapping(sensor_idx)
-            
-            # Each sensor has 3 parallel links
             base_link_idx = sensor_idx * 3
-            
-            # Compute and accumulate the output from each link
             for offset in range(3):
                 link_idx = base_link_idx + offset
                 wheel_outputs[wheel_idx] += self.compute_sensor_to_wheel_output(sensor_value, link_idx)
@@ -281,6 +263,8 @@ class Animat:
         
         # Move based on wheel speeds
         self.move(dt)
+        # Track speed after moving
+        self.speed_history.append(self.get_forward_speed())
         
         # Deplete batteries
         self.batteries[0] -= settings.BATTERY_DECAY_RATE * dt
@@ -335,3 +319,9 @@ class Animat:
         The wheel speeds themselves are scaled by ANIMAT_MAX_SPEED.
         """
         return (self.wheel_speeds[0] + self.wheel_speeds[1]) / 2.0
+
+    def get_average_speed(self):
+        """Return the average forward speed over the animat's lifetime."""
+        if not self.speed_history:
+            return 0.0
+        return sum(self.speed_history) / len(self.speed_history)

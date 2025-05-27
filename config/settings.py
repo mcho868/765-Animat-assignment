@@ -25,16 +25,27 @@ BATTERY_DECAY_RATE = 1.0  # Paper specifies decreases by 1 each time step
 ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 
 #Genetic algorithm settings
-POPULATION_SIZE = 100
-MUTATION_RATE = 0.04  # 4% per bit (Note: current mutation is per-gene)
-CROSSOVER_RATE = 0.5
+POPULATION_SIZE = 200
+MUTATION_RATE = 0.08  # 4% per bit (Note: current mutation is per-gene)
+CROSSOVER_RATE = 0.8
 NUM_GENERATIONS = 200
-TOURNAMENT_SIZE = 2
+TOURNAMENT_SIZE = 5
 
 #Sensorimotor link settings
 LINK_PARAM_COUNT = 9
 NUM_LINKS = 9  # Only 9 links need to be genetically specified due to left-right symmetry
 GENOTYPE_SIZE = NUM_LINKS * LINK_PARAM_COUNT + 2  # 9*9 + 2 = 83 total integers
+NUM_SENSORS = 6  # Default, will be updated
+
+def update_sensor_settings(num_animats):
+    if num_animats == 1:
+        num_sensors = 6
+    else:
+        num_sensors = 8
+    global NUM_LINKS, GENOTYPE_SIZE, NUM_SENSORS
+    NUM_SENSORS = num_sensors
+    NUM_LINKS = num_sensors * 3 // 2  # Only left-side links are encoded, right are mirrored
+    GENOTYPE_SIZE = NUM_LINKS * LINK_PARAM_COUNT + 2
 
 #Simulation mode
 HEADLESS_MODE = True  # Set to True to run simulations without visualization

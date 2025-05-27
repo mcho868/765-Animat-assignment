@@ -22,21 +22,48 @@ class Simulator:
     - Logging results
     """
     
-    def __init__(self, width=settings.WINDOW_WIDTH, height=settings.WINDOW_HEIGHT, 
-                 headless=settings.HEADLESS_MODE):
+    def __init__(self, num_animats=1, width=None, height=None, headless=None):
         """Initialize the simulator.
         
         Args:
+            num_animats: Number of animats
             width: Window width for visualization
             height: Window height for visualization
             headless: Whether to run in headless mode (no visualization)
         """
+        # Set up environment and agent parameters based on num_animats
+        self.num_animats = num_animats
+        if num_animats == 1:
+            env_size = settings.ENV_SIZE
+            food_count = settings.FOOD_COUNT
+            water_count = settings.WATER_COUNT
+            trap_count = settings.TRAP_COUNT
+            sensor_range = settings.SENSOR_RANGE
+        else:
+            env_size = 200 * num_animats
+            food_count = 3 * num_animats
+            water_count = 3 * num_animats
+            trap_count = 9 * num_animats
+            sensor_range = 200 * num_animats
+        # Override settings for this run
+        settings.ENV_SIZE = env_size
+        settings.FOOD_COUNT = food_count
+        settings.WATER_COUNT = water_count
+        settings.TRAP_COUNT = trap_count
+        settings.SENSOR_RANGE = sensor_range
+        # Window size for visualization
+        if width is None:
+            width = env_size
+        if height is None:
+            height = env_size
+        if headless is None:
+            headless = settings.HEADLESS_MODE
         self.width = width
         self.height = height
         self.headless = headless
         
         # Initialize the environment
-        self.environment = Environment()
+        self.environment = Environment(width=env_size, height=env_size)
         
         # Initialize the genetic algorithm
         self.ga = GeneticAlgorithm()
@@ -468,6 +495,13 @@ class Simulator:
             
             self.logger.log_generation(gen, fitnesses, best_genome, avg_fitness)
             
+            # Log average speed for this generation
+            all_speeds = []
+            for animat in animats:
+                all_speeds.append(animat.get_average_speed())
+            avg_speed = sum(all_speeds) / len(all_speeds) if all_speeds else 0.0
+            self.logger.log_average_speed(gen, avg_speed)
+            
             # Update GA's best genome
             if best_genome is not None and (self.ga.best_genome is None or best_fitness > self.ga.best_fitness):
                 self.ga.best_genome = best_genome.copy()
@@ -567,6 +601,34 @@ class Simulator:
         plt.savefig('evolution_stats.png')
         print("Evolution statistics saved to evolution_stats.png")
         
+        if not self.headless:
+            plt.show()
+        
+    def plot_speed_stats(self):
+        """Plot the average speed per generation from the speed log."""
+        import csv
+        import matplotlib.pyplot as plt
+        generations = []
+        avg_speeds = []
+        try:
+            with open(self.logger.speed_log_file, 'r') as f:
+                reader = csv.reader(f)
+                next(reader)  # skip header
+                for row in reader:
+                    generations.append(int(row[0]))
+                    avg_speeds.append(float(row[1]))
+        except Exception as e:
+            print(f"Error reading speed log: {e}")
+            return
+        plt.figure(figsize=(10, 6))
+        plt.plot(generations, avg_speeds, label='Avg Speed', color='purple')
+        plt.title('Average Animat Speed per Generation')
+        plt.xlabel('Generation')
+        plt.ylabel('Average Speed')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('average_speed_stats.png')
+        print("Average speed statistics saved to average_speed_stats.png")
         if not self.headless:
             plt.show()
         

@@ -24,6 +24,7 @@ class Logger:
         self.battery_log_file = os.path.join(log_dir, f"battery_log_{self.timestamp}.csv")
         self.behavior_log_file = os.path.join(log_dir, f"behavior_log_{self.timestamp}.csv")
         self.simulation_log_file = os.path.join(log_dir, f"simulation_log_{self.timestamp}.json")
+        self.speed_log_file = os.path.join(log_dir, f"speed_log_{self.timestamp}.csv")
         
         # Initialize CSV files with headers
         with open(self.battery_log_file, 'w', newline='') as f:
@@ -34,6 +35,10 @@ class Logger:
             writer = csv.writer(f)
             writer.writerow(["Timestamp", "Animat ID", "Left Wheel", "Right Wheel", "Direction X", "Direction Y", "Speed"])
             
+        with open(self.speed_log_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["Generation", "AverageSpeed"])
+        
         self.simulation_data = {
             "start_time": time.time(),
             "settings": {},
@@ -136,4 +141,10 @@ class Logger:
     def _save_simulation_data(self):
         """Save the simulation data to the JSON file."""
         with open(self.simulation_log_file, 'w') as f:
-            json.dump(self.simulation_data, f, indent=2) 
+            json.dump(self.simulation_data, f, indent=2)
+    
+    def log_average_speed(self, generation_num, avg_speed):
+        """Log the average speed for a generation."""
+        with open(self.speed_log_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([generation_num, avg_speed]) 

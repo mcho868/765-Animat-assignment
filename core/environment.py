@@ -51,13 +51,15 @@ class Trap(Entity):
 class Environment:
     """The 2D environment containing all entities."""
     
-    def __init__(self, width=settings.ENV_SIZE, height=settings.ENV_SIZE):
+    def __init__(self, width=settings.ENV_SIZE, height=settings.ENV_SIZE, num_animats=1):
         """Initialize the environment.
         
         Args:
             width: Width of the environment
             height: Height of the environment
+            num_animats: Number of animats in the environment
         """
+        self.num_animats = num_animats
         self.width = width
         self.height = height
         self.entities = []
@@ -152,6 +154,11 @@ class Environment:
             'trap_left': 0.0, 'trap_right': 0.0
         }
         
+        # Add other animat sensors if multi-animat
+        if self.num_animats > 1:
+            readings['other_left'] = 0.0
+            readings['other_right'] = 0.0
+        
         # Define the range vector for each side (assuming animat has direction)
         # Rotate the direction vector 90 degrees for left/right
         left_vec = np.array([-animat.direction[1], animat.direction[0]])
@@ -160,6 +167,23 @@ class Environment:
         # Calculate readings for each entity type
         for entity in self.entities:
             if not entity.active or entity.type == EntityType.ANIMAT:
+                # For other animat sensors, process separately
+                if self.num_animats > 1 and entity != animat:
+                    vec_to_entity = entity.position - animat.position
+                    distance = np.linalg.norm(vec_to_entity)
+                    if distance > settings.SENSOR_RANGE:
+                        continue
+                    if distance > 0:
+                        direction_to_entity = vec_to_entity / distance
+                    else:
+                        continue
+                    left_dot = np.dot(direction_to_entity, left_vec)
+                    right_dot = np.dot(direction_to_entity, right_vec)
+                    sensor_value = max(0, 100 * (1 - distance / settings.SENSOR_RANGE))
+                    if left_dot > 0:
+                        readings['other_left'] = max(readings['other_left'], sensor_value * 1.2 * left_dot)
+                    if right_dot > 0:
+                        readings['other_right'] = max(readings['other_right'], sensor_value * 1.2 * right_dot)
                 continue
                 
             # Vector from animat to entity
@@ -204,6 +228,11 @@ class Environment:
                 if right_dot > 0:
                     readings['trap_right'] = max(readings['trap_right'], sensor_value * 1.2 * right_dot)
         
+        # Ensure all expected keys are present
+        base_keys = ['food_left', 'food_right', 'water_left', 'water_right', 'trap_left', 'trap_right', 'other_left', 'other_right']
+        for k in base_keys:
+            if k not in readings:
+                readings[k] = 0.0
         return readings
     
     def respawn_entity(self, entity):
@@ -277,6 +306,17 @@ class Environment:
                     # Animat dies
                     animat.active = False
                     
+            # Battery decay if animats are close
+            if self.num_animats > 1:
+                for other in self.animats:
+                    if other is not animat and other.active:
+                        distance = np.linalg.norm(animat.position - other.position)
+                        if distance <= 5:
+                            animat.batteries[0] = max(0, animat.batteries[0] - 10)
+                            animat.batteries[1] = max(0, animat.batteries[1] - 10)
+                            other.batteries[0] = max(0, other.batteries[0] - 10)
+                            other.batteries[1] = max(0, other.batteries[1] - 10)
+            
             # Check if batteries are depleted
             if animat.batteries[0] <= 0 and animat.batteries[1] <= 0:
                 animat.active = False 

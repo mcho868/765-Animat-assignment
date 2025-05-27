@@ -28,6 +28,17 @@ def parse_arguments():
     
     return parser.parse_args()
 
+def get_num_animats():
+    while True:
+        try:
+            n = int(input("Enter number of animats (1-10): "))
+            if 1 <= n <= 10:
+                return n
+            else:
+                print("Please enter a number between 1 and 10.")
+        except ValueError:
+            print("Invalid input. Please enter an integer.")
+
 def main():
     """Main function to set up and run the simulation."""
     # Parse command line arguments
@@ -43,8 +54,9 @@ def main():
     settings.POPULATION_SIZE = args.population
     settings.NUM_GENERATIONS = args.generations
     
-    # Create simulator
-    simulator = Simulator(headless=settings.HEADLESS_MODE)
+    num_animats = get_num_animats()
+    settings.update_sensor_settings(num_animats)
+    simulator = Simulator(num_animats=num_animats)
     
     # Run evolution
     print(f"Starting evolution with population size {settings.POPULATION_SIZE} "

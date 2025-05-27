@@ -451,6 +451,7 @@ class Simulator:
             # Ensure fitnesses list has the right length
             while len(fitnesses) < settings.POPULATION_SIZE:
                 fitnesses.append(0)
+
             
             # Log stats
             avg_fitness = sum(fitnesses) / len(fitnesses) if fitnesses else 0

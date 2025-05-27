@@ -38,6 +38,9 @@ class Animat:
         self.active = True
         self.type = EntityType.ANIMAT
         
+        # Initialize survival time tracking
+        self.survival_time = 0.0
+        
         # Initialize direction (heading)
         if direction is None:
             angle = np.random.uniform(0, 2 * np.pi)
@@ -396,6 +399,9 @@ class Animat:
         """
         if not self.active:
             return
+        
+        # Track survival time
+        self.survival_time += dt
             
         # Get sensor readings from environment
         sensor_readings = environment.get_sensor_readings(self)
@@ -443,14 +449,18 @@ class Animat:
         self.position += forward_speed * dt * self.direction
         
     def get_fitness(self):
-        """Calculate the fitness of this animat based on battery levels.
+        """Calculate the fitness of this animat based on survival time.
         
         Returns:
-            Fitness score (normalized according to paper, 0-1 range)
+            Fitness score (survival time in seconds or battery level)
         """
         # F = (B1 + B2) / (2 * BATTERY_MAX) to align with paper's F = (B1 + B2)/400.0
         # where BATTERY_MAX from paper is 200.
-        return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)
+
+        if settings.BATTERY_FITNESS_MODE:
+            return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)
+        else:
+            return self.survival_time
 
     def get_forward_speed(self):
         """

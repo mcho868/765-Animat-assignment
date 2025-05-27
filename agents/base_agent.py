@@ -120,10 +120,11 @@ class Animat:
             angle3 = np.clip(angle3, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
             grad3_val = np.tan(angle3)
 
-            # Slope and offset modulation degrees (paper does not explicitly scale these beyond being 0-99 derived)
-            # Current code uses / 10.0. Retaining this specific scaling.
-            slope_mod_val = self.genome[i + 6] / 10.0
-            offset_mod_val = self.genome[i + 7] / 10.0
+            # Slope and offset modulation according to paper specifications
+            # Slope modulation S ∈ (0 : 1)
+            slope_mod_val = self.genome[i + 6] / 99.0  # 0-99 → 0.0 to 1.0
+            # Offset modulation O ∈ (-1 : 1)  
+            offset_mod_val = self._scale_genome_value(self.genome[i + 7], -1.0, 1.0)
             
             battery_val = self.genome[i + 8] # Already 0 or 1, used directly
 

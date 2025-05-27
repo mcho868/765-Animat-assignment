@@ -54,7 +54,7 @@ def main():
         # Visualization specific settings for run_evolution_with_visualization
         # These could be hardcoded or moved to config.py if they are fixed
         parallel_viz_default = 100 # Default if not specified elsewhere
-        speed_multiplier_default = 10 # Default if not specified elsewhere
+        speed_multiplier_default = 1000 # Default if not specified elsewhere
         
         print(f"Visualizing evolution in progress with {parallel_viz_default} parallel animats (speed: {speed_multiplier_default}x)")
         best_genome, best_fitness = simulator.run_evolution_with_visualization(
@@ -63,7 +63,9 @@ def main():
         # Optionally, run the best animat after visualization
         # This part can be kept or removed based on desired behavior after visualized evolution
         print("Running simulation with best evolved animat after visualization")
-        simulator.run_best_animat(best_genome, max_time=6000, speed_multiplier=10) # Example parameters
+
+        for i in range(10):
+            simulator.run_best_animat(best_genome, max_time=6000, speed_multiplier=10) # Example parameters
     
     print(f"Evolution complete! Best fitness: {best_fitness:.2f}")
     

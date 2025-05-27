@@ -7,6 +7,7 @@ import random
 import numpy as np
 from config import settings
 from core.simulator import Simulator
+from agents.agent_logic import simulate_animat
 
 def parse_arguments():
     """Parse command line arguments.
@@ -25,6 +26,8 @@ def parse_arguments():
                         help="Random seed for reproducibility (None for random)")
     parser.add_argument("--visualize-evolution", action="store_true",
                         help="Visualize evolution in progress instead of headless mode")
+    parser.add_argument("--run-seth", action="store_true",
+                        help="Run Seth's specific model from the paper with predefined link configurations")
     
     return parser.parse_args()
 
@@ -46,9 +49,19 @@ def main():
     # Create simulator
     simulator = Simulator(headless=settings.HEADLESS_MODE)
     
+    # Check if running Seth's model
+    if args.run_seth:
+        print("Running Seth's specific model from the paper...")
+        simulator.run_seth_model(max_time=3000, speed_multiplier=1)  # 5 minute simulation
+        simulator.cleanup()
+        return
+    
     # Run evolution
     print(f"Starting evolution with population size {settings.POPULATION_SIZE} "
             f"for {settings.NUM_GENERATIONS} generations")
+    
+    best_genome = None
+    best_fitness = 0
     
     if args.visualize_evolution:
         # Visualization specific settings for run_evolution_with_visualization
@@ -63,12 +76,15 @@ def main():
         # Optionally, run the best animat after visualization
         # This part can be kept or removed based on desired behavior after visualized evolution
         print("Running simulation with best evolved animat after visualization")
-        simulator.run_best_animat(best_genome, max_time=6000, speed_multiplier=10) # Example parameters
+
+        for i in range(10):
+            simulator.run_best_animat(best_genome, max_time=6000, speed_multiplier=10) # Example parameters
     
     print(f"Evolution complete! Best fitness: {best_fitness:.2f}")
     
-    # Plot statistics
-    simulator.plot_stats()
+    # Plot statistics if we have data
+    if hasattr(simulator, 'generation_stats') and simulator.generation_stats['generation']:
+        simulator.plot_stats()
     
     # Clean up
     simulator.cleanup()

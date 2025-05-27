@@ -38,6 +38,9 @@ class Animat:
         self.active = True
         self.type = EntityType.ANIMAT
         
+        # Initialize survival time tracking
+        self.survival_time = 0.0
+        
         # Initialize direction (heading)
         if direction is None:
             angle = np.random.uniform(0, 2 * np.pi)
@@ -55,6 +58,8 @@ class Animat:
         # Initialize genome (sensorimotor link parameters)
         if genome is None:
             self.initialize_random_genome()
+        elif isinstance(genome, str) and genome == "seth":
+            self.initialize_seth_genome()
         else:
             self.genome = genome.copy()
             
@@ -85,6 +90,127 @@ class Animat:
             # Every 9th gene indicates battery
             self.genome[i + 8] = np.random.choice([0, 1])  # 0 for battery 1, 1 for battery 2
             
+    def initialize_seth_genome(self):
+        """Initialize a genome based on Seth's specific link configurations from the paper.
+        
+        Creates the 9 links shown in the paper figures with their specific parameters:
+        - Link 1 (bat 1): Food left sensor, specific piecewise linear function
+        - Link 2 (bat 2): Food left sensor, declining linear function  
+        - Link 3 (bat 2): Food left sensor, declining linear function
+        - Link 4 (bat 2): Water left sensor, piecewise function
+        - Link 5 (bat 2): Water left sensor, declining function
+        - Link 6 (bat 1): Water left sensor, rising then flat function
+        - Link 7 (bat 1): Trap left sensor, V-shaped function
+        - Link 8 (bat 2): Trap left sensor, step function
+        - Link 9 (bat 1): Trap left sensor, rising sigmoid-like function
+        """
+        genome_size = settings.GENOTYPE_SIZE
+        self.genome = np.zeros(genome_size, dtype=int)
+        
+        # Link 1 (bat 1) - Food left: Piecewise linear rising then declining
+        # Initial offset around 20, grad1 positive, thresh1 around 60, grad2 negative, thresh2 around 80
+        self.genome[0] = 30   # offset -> scales to ~-40
+        self.genome[1] = 75   # grad1 -> positive slope
+        self.genome[2] = 80   # thresh1 -> ~60
+        self.genome[3] = 25   # grad2 -> negative slope  
+        self.genome[4] = 90   # thresh2 -> ~80
+        self.genome[5] = 50   # grad3 -> ~0 slope
+        self.genome[6] = 20   # slope_mod -> 0.2
+        self.genome[7] = 70   # offset_mod -> positive
+        self.genome[8] = 0    # battery 1
+        
+        # Link 2 (bat 2) - Food left: Declining linear function
+        self.genome[9] = 95   # offset -> high positive (~90)
+        self.genome[10] = 15  # grad1 -> negative slope
+        self.genome[11] = 50  # thresh1 -> middle
+        self.genome[12] = 15  # grad2 -> same negative slope
+        self.genome[13] = 80  # thresh2 -> high
+        self.genome[14] = 15  # grad3 -> same negative slope
+        self.genome[15] = 10  # slope_mod -> low
+        self.genome[16] = 30  # offset_mod -> slightly negative
+        self.genome[17] = 1   # battery 2
+        
+        # Link 3 (bat 2) - Food left: Declining linear function (similar to link 2)
+        self.genome[18] = 85  # offset -> positive
+        self.genome[19] = 20  # grad1 -> negative slope
+        self.genome[20] = 40  # thresh1 -> lower
+        self.genome[21] = 20  # grad2 -> negative slope
+        self.genome[22] = 70  # thresh2 -> high
+        self.genome[23] = 20  # grad3 -> negative slope
+        self.genome[24] = 15  # slope_mod -> low
+        self.genome[25] = 25  # offset_mod -> negative
+        self.genome[26] = 1   # battery 2
+        
+        # Link 4 (bat 2) - Water left: Piecewise function starting high, dropping, then rising
+        self.genome[27] = 75  # offset -> positive
+        self.genome[28] = 15  # grad1 -> negative slope initially
+        self.genome[29] = 30  # thresh1 -> early threshold
+        self.genome[30] = 5   # grad2 -> very negative slope
+        self.genome[31] = 75  # thresh2 -> later threshold
+        self.genome[32] = 85  # grad3 -> positive slope
+        self.genome[33] = 25  # slope_mod -> moderate
+        self.genome[34] = 20  # offset_mod -> negative
+        self.genome[35] = 1   # battery 2
+        
+        # Link 5 (bat 2) - Water left: Simple declining function
+        self.genome[36] = 50  # offset -> middle
+        self.genome[37] = 25  # grad1 -> negative slope
+        self.genome[38] = 40  # thresh1 -> middle
+        self.genome[39] = 15  # grad2 -> more negative
+        self.genome[40] = 80  # thresh2 -> high
+        self.genome[41] = 5   # grad3 -> very negative
+        self.genome[42] = 20  # slope_mod -> low
+        self.genome[43] = 30  # offset_mod -> slightly negative
+        self.genome[44] = 1   # battery 2
+        
+        # Link 6 (bat 1) - Water left: Rising then flat function
+        self.genome[45] = 5   # offset -> low (~-90)
+        self.genome[46] = 85  # grad1 -> positive slope
+        self.genome[47] = 60  # thresh1 -> middle-high
+        self.genome[48] = 50  # grad2 -> flat/small slope
+        self.genome[49] = 80  # thresh2 -> high
+        self.genome[50] = 50  # grad3 -> flat
+        self.genome[51] = 80  # slope_mod -> high modulation
+        self.genome[52] = 70  # offset_mod -> positive
+        self.genome[53] = 0   # battery 1
+        
+        # Link 7 (bat 1) - Trap left: V-shaped function
+        self.genome[54] = 85  # offset -> high positive
+        self.genome[55] = 15  # grad1 -> negative slope
+        self.genome[56] = 45  # thresh1 -> middle
+        self.genome[57] = 75  # grad2 -> positive slope
+        self.genome[58] = 70  # thresh2 -> high
+        self.genome[59] = 85  # grad3 -> positive slope
+        self.genome[60] = 60  # slope_mod -> high
+        self.genome[61] = 50  # offset_mod -> neutral
+        self.genome[62] = 0   # battery 1
+        
+        # Link 8 (bat 2) - Trap left: Step function dropping at ~60
+        self.genome[63] = 50  # offset -> middle
+        self.genome[64] = 50  # grad1 -> flat initially
+        self.genome[65] = 80  # thresh1 -> high (around 60 scaled)
+        self.genome[66] = 5   # grad2 -> very negative (step down)
+        self.genome[67] = 85  # thresh2 -> very high
+        self.genome[68] = 15  # grad3 -> negative
+        self.genome[69] = 10  # slope_mod -> low
+        self.genome[70] = 40  # offset_mod -> slightly negative
+        self.genome[71] = 1   # battery 2
+        
+        # Link 9 (bat 1) - Trap left: Rising sigmoid-like function
+        self.genome[72] = 5   # offset -> low start (~-90)
+        self.genome[73] = 50  # grad1 -> flat initially
+        self.genome[74] = 70  # thresh1 -> later
+        self.genome[75] = 85  # grad2 -> steep rise
+        self.genome[76] = 85  # thresh2 -> high
+        self.genome[77] = 95  # grad3 -> very steep
+        self.genome[78] = 90  # slope_mod -> high modulation
+        self.genome[79] = 80  # offset_mod -> positive
+        self.genome[80] = 0   # battery 1
+        
+        # Sigmoid thresholds for wheels (final 2 genes)
+        self.genome[81] = 50  # Left wheel sigmoid threshold
+        self.genome[82] = 50  # Right wheel sigmoid threshold
+        
     def parse_genome(self):
         """Parse the genome into sensorimotor links with left-right symmetry enforcement.
         
@@ -120,10 +246,11 @@ class Animat:
             angle3 = np.clip(angle3, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
             grad3_val = np.tan(angle3)
 
-            # Slope and offset modulation degrees (paper does not explicitly scale these beyond being 0-99 derived)
-            # Current code uses / 10.0. Retaining this specific scaling.
-            slope_mod_val = self.genome[i + 6] / 10.0
-            offset_mod_val = self.genome[i + 7] / 10.0
+            # Slope and offset modulation according to paper specifications
+            # Slope modulation S ∈ (0 : 1)
+            slope_mod_val = self.genome[i + 6] / 99.0  # 0-99 → 0.0 to 1.0
+            # Offset modulation O ∈ (-1 : 1)  
+            offset_mod_val = self._scale_genome_value(self.genome[i + 7], -1.0, 1.0)
             
             battery_val = self.genome[i + 8] # Already 0 or 1, used directly
 
@@ -272,6 +399,9 @@ class Animat:
         """
         if not self.active:
             return
+        
+        # Track survival time
+        self.survival_time += dt
             
         # Get sensor readings from environment
         sensor_readings = environment.get_sensor_readings(self)
@@ -319,14 +449,18 @@ class Animat:
         self.position += forward_speed * dt * self.direction
         
     def get_fitness(self):
-        """Calculate the fitness of this animat based on battery levels.
+        """Calculate the fitness of this animat based on survival time.
         
         Returns:
-            Fitness score (normalized according to paper, 0-1 range)
+            Fitness score (survival time in seconds or battery level)
         """
         # F = (B1 + B2) / (2 * BATTERY_MAX) to align with paper's F = (B1 + B2)/400.0
         # where BATTERY_MAX from paper is 200.
-        return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)
+
+        if settings.BATTERY_FITNESS_MODE:
+            return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)
+        else:
+            return self.survival_time
 
     def get_forward_speed(self):
         """

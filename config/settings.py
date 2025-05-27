@@ -28,8 +28,8 @@ ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 POPULATION_SIZE = 100
 MUTATION_RATE = 0.04  # 4% per bit (Note: current mutation is per-gene)
 CROSSOVER_RATE = 0.5
-NUM_GENERATIONS = 200
-TOURNAMENT_SIZE = 2
+NUM_GENERATIONS = 300
+TOURNAMENT_SIZE = 5
 
 #Sensorimotor link settings
 LINK_PARAM_COUNT = 9
@@ -41,4 +41,7 @@ HEADLESS_MODE = True  # Set to True to run simulations without visualization
 LOGGING_ENABLED = False
 SIMULATION=1000
 #Random seed for reproducibility (set to None for random)
-RANDOM_SEED = 42
+RANDOM_SEED = None
+
+SIMULATION_END_PERCENTAGE = 100
+BATTERY_FITNESS_MODE = False

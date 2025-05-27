@@ -276,7 +276,7 @@ class Simulator:
         dead_count = sum(1 for animat in animats if not animat.active)
         death_percentage = (dead_count / total_population) * 100
         
-        if death_percentage >= 50.0:
+        if death_percentage >= settings.SIMULATION_END_PERCENTAGE:
             print(f"  Generation {generation + 1}: {dead_count}/{total_population} animats died ({death_percentage:.1f}%) - Terminating generation early")
             return True
         
@@ -606,3 +606,77 @@ class Simulator:
         """Reset the simulation."""
         self.environment = Environment()
         self.simulation_time = 0 
+
+    def run_seth_model(self, max_time=60, speed_multiplier=1.0):
+        """Run a simulation with Seth's specific animat model from the paper.
+        
+        Args:
+            max_time: Maximum simulation time in seconds
+            speed_multiplier: Speed multiplier for simulation (higher = faster)
+        """
+        print("Running Seth's model with specific link configurations from the paper...")
+        
+        # Reset the environment
+        self.environment = Environment()
+        self.environment.initialize_random_environment()
+        
+        # Create animat with Seth's specific genome
+        center_pos = (self.environment.width/2, self.environment.height/2)
+        animat = Animat(center_pos, "seth")  # Special string to trigger seth genome
+        self.environment.add_entity(animat)
+        
+        print("Seth's animat created with the following link configuration:")
+        print("- Links 1-3: Food sensors (mix of battery 1 & 2)")
+        print("- Links 4-6: Water sensors (mix of battery 1 & 2)")  
+        print("- Links 7-9: Trap sensors (mix of battery 1 & 2)")
+        print("- Each sensor type has varied transfer functions as shown in the paper")
+        
+        # Run simulation loop
+        self.is_running = True
+        self.simulation_time = 0
+        last_time = time.time()
+        self.trajectory_to_draw = []  # Clear previous trajectory
+        MAX_TRAJECTORY_POINTS = 500
+        
+        # Use fixed timestep like in the evolution simulation
+        SIMULATION_TIMESTEP = 0.1  # Fixed 0.1 second timestep
+        step_count = 0
+        max_steps = int(max_time / SIMULATION_TIMESTEP)
+        
+        while self.is_running and step_count < max_steps:
+            # Handle events
+            if not self.handle_events():
+                self.is_running = False
+                break
+                
+            # Update simulation with fixed timestep
+            self.environment.update(SIMULATION_TIMESTEP)
+            self.simulation_time += SIMULATION_TIMESTEP
+            step_count += 1
+            
+            # Add current animat position to trajectory
+            if animat.active:
+                if len(self.trajectory_to_draw) >= MAX_TRAJECTORY_POINTS:
+                    self.trajectory_to_draw.pop(0)  # Remove oldest point
+                self.trajectory_to_draw.append(tuple(animat.position))
+
+            # Render
+            self.render()
+            
+            # Check if animat died
+            if not animat.active:
+                print(f"Seth's animat died after {self.simulation_time:.1f} seconds")
+                print(f"Final battery levels: Battery 1: {animat.batteries[0]:.1f}, Battery 2: {animat.batteries[1]:.1f}")
+                print(f"Final fitness: {animat.get_fitness():.3f}")
+                self.is_running = False
+                break
+                
+            # Cap frame rate
+            if not self.headless:
+                self.clock.tick(self.fps)
+                
+        # Print final statistics
+        if animat.active:
+            print(f"Seth's animat survived the full simulation!")
+            print(f"Final battery levels: Battery 1: {animat.batteries[0]:.1f}, Battery 2: {animat.batteries[1]:.1f}")
+            print(f"Final fitness: {animat.get_fitness():.3f}") 

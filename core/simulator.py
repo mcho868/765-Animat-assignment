@@ -261,6 +261,27 @@ class Simulator:
         # Draw section border for clarity
         pygame.draw.rect(self.screen, (200, 200, 200), (x, y, width, height), 1)
         
+    def track_animat_deaths(self, animats, active_animats, generation):
+        """Track animat deaths and check if 50% of population has died.
+        
+        Args:
+            animats: List of animat objects
+            active_animats: List of boolean values indicating if each animat is active
+            generation: Current generation number
+            
+        Returns:
+            bool: True if 50% or more of the population has died
+        """
+        total_population = len(animats)
+        dead_count = sum(1 for animat in animats if not animat.active)
+        death_percentage = (dead_count / total_population) * 100
+        
+        if death_percentage >= 50.0:
+            print(f"  Generation {generation + 1}: {dead_count}/{total_population} animats died ({death_percentage:.1f}%) - Terminating generation early")
+            return True
+        
+        return False
+        
     def run_evolution_with_visualization(self, num_generations=settings.NUM_GENERATIONS, parallel_count=1, speed_multiplier=1.0):
         """Run the evolutionary algorithm with visualization.
         
@@ -298,9 +319,9 @@ class Simulator:
             self.generation = gen
             print(f"Generation {gen+1}/{num_generations}")
             
-            # Process animats in parallel batches
-            batch_size = min(parallel_count, settings.POPULATION_SIZE)
-            num_batches = (settings.POPULATION_SIZE + batch_size - 1) // batch_size
+            # Process animats in parallel batches (assume batch_size = population_size)
+            batch_size = settings.POPULATION_SIZE  # Force batch_size to equal population_size
+            num_batches = 1  # Only one batch since batch_size = population_size
             
             fitnesses = []
             best_fitness = 0
@@ -383,6 +404,11 @@ class Simulator:
                         
                         any_active = current_batch_still_active # Update overall status for the batch
                         accumulated_sim_steps += 1
+                        
+                        # Check if 50% of animats have died (assuming batch_size = population_size)
+                        if self.track_animat_deaths(animats, active_animats, gen):
+                            any_active = False  # Force termination of the generation
+                            break
                         
                         if not any_active: # if all animats died in this simulation step, break from inner (sim_steps) loop
                             break

@@ -10,8 +10,14 @@ class Animat:
     Animat class implementing a simple agent with:
     - Two wheels (left and right)
     - Six sensors (food, water, trap on both left and right)
-    - 18 sensorimotor links (3 per sensor, connecting to same-side wheel)
+    - 18 sensorimotor links (3 per sensor)
     - Two batteries (energy levels)
+    
+    Key paper specifications:
+    - Links 0-8 connect to left wheel, links 9-17 connect to right wheel
+    - Each link outputs [-1, 1], summ   ed outputs go through sigmoid
+    - Final wheel speeds are [-10, 10], where +10,+10 = 2.8 units/timestep
+    - Batteries start at 200, decay by 1 per timestep
     """
     
     def _scale_genome_value(self, val, min_val, max_val):
@@ -49,10 +55,10 @@ class Animat:
             self.direction = np.array(direction, dtype=float)
             self.direction /= np.linalg.norm(self.direction)  # Normalize
         
-        # Energy levels (batteries)
+        # Energy levels (batteries) - paper specifies initial level 200
         self.batteries = [settings.BATTERY_MAX, settings.BATTERY_MAX]
         
-        # Wheels (store current speed values)
+        # Wheels (store current speed values in [-10, 10] range)
         self.wheel_speeds = [0.0, 0.0]  # [left, right]
         
         # Initialize genome (sensorimotor link parameters)
@@ -63,7 +69,7 @@ class Animat:
         else:
             self.genome = genome.copy()
             
-        # Extract and scale sigmoid thresholds from genome
+        # Extract and scale sigmoid thresholds from genome (positions 81-82)
         self.sigmoid_thresholds = [
             self._scale_sigmoid_genome_value(self.genome[-2]),  # Left wheel
             self._scale_sigmoid_genome_value(self.genome[-1])   # Right wheel
@@ -82,7 +88,7 @@ class Animat:
         # [offset, grad1, thresh1, grad2, thresh2, grad3, slope_mod, offset_mod, battery]
         # Final 2 genes are sigmoid thresholds for wheels
         
-        genome_size = settings.GENOTYPE_SIZE
+        genome_size = settings.GENOTYPE_SIZE  # Should be 83
         self.genome = np.random.randint(0, 100, genome_size)
         
         # Ensure thresh2 >= thresh1 for each of the 9 encoded links
@@ -116,11 +122,10 @@ class Animat:
         - Link 8 (bat 2): Trap left sensor, step function
         - Link 9 (bat 1): Trap left sensor, rising sigmoid-like function
         """
-        genome_size = settings.GENOTYPE_SIZE
+        genome_size = settings.GENOTYPE_SIZE  # Should be 83
         self.genome = np.zeros(genome_size, dtype=int)
         
         # Link 1 (bat 1) - Food left: Piecewise linear rising then declining
-        # Initial offset around 20, grad1 positive, thresh1 around 60, grad2 negative, thresh2 around 80
         self.genome[0] = 30   # offset -> scales to ~-40
         self.genome[1] = 75   # grad1 -> positive slope
         self.genome[2] = 80   # thresh1 -> ~60
@@ -220,18 +225,18 @@ class Animat:
         self.genome[80] = 0   # battery 1
         
         # Sigmoid thresholds for wheels (final 2 genes)
-        self.genome[81] = 50  # Left wheel sigmoid threshold
-        self.genome[82] = 50  # Right wheel sigmoid threshold
+        self.genome[81] = 50  # Left wheel sigmoid threshold -> scales to 0.0
+        self.genome[82] = 50  # Right wheel sigmoid threshold -> scales to 0.0
         
     def parse_genome(self):
         """Parse the genome into sensorimotor links with left-right symmetry enforcement.
         
         The genome encodes 9 links which are then mirrored to create 18 total links.
-        Links 0,2,4 (left sensors) are encoded, and links 1,3,5 (right sensors) mirror them.
+        Left sensors use encoded links directly, right sensors mirror them.
         """
         self.links = []
         
-        # First, parse the 9 encoded links from the genome
+        # First, parse the 9 encoded links from the genome (positions 0-80)
         encoded_links = []
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
             # Scale offset (0-99 to -100 to +100)
@@ -264,7 +269,7 @@ class Animat:
             # Offset modulation O ∈ (-1 : 1)  
             offset_mod_val = self._scale_genome_value(self.genome[i + 7], -1.0, 1.0)
             
-            battery_val = self.genome[i + 8] # Already 0 or 1, used directly
+            battery_val = self.genome[i + 8]  # Already 0 or 1, used directly
 
             link_params = {
                 'offset': offset_val,
@@ -295,22 +300,17 @@ class Animat:
                     left_sensor_idx = sensor_idx - 1
                     encoded_idx = (left_sensor_idx // 2) * 3 + link_offset
                     self.links.append(encoded_links[encoded_idx].copy())
-
-    def get_sensor_to_wheel_mapping(self, sensor_index):
-        """Determine which wheel a sensor connects to based on side.
+                    
+    def compute_sensor_to_wheel_output(self, sensor_value, link_index):
+        """Compute the output of a sensorimotor link.
         
         Args:
-            sensor_index: Index of the sensor (0-5)
+            sensor_value: Current sensor reading (0-100)
+            link_index: Index of the link to use
             
         Returns:
-            Index of the wheel (0=left, 1=right)
+            Output value limited to [-1, 1] range as per paper
         """
-        # Sensors 0, 2, 4 are on the left, connect to left wheel (0)
-        # Sensors 1, 3, 5 are on the right, connect to right wheel (1)
-        return sensor_index % 2
-        
-    def compute_sensor_to_wheel_output(self, sensor_value, link_index):
-        """Compute the output of a sensorimotor link."""
         link = self.links[link_index]
         
         # Get battery modulation
@@ -335,69 +335,85 @@ class Animat:
         output += offset_modulation
         output += output * slope_modulation_factor
         
-        # Limit output to range [-1, 1]
-        return max(-1.0, min(1.0, output))
+        # Paper specifies link outputs are "ranged from -1 to 1"
+        return max(-1.0, min(1.0, output/100))
             
     def compute_wheel_speed(self, sensor_readings):
         """Compute wheel speeds based on sensor readings and sensorimotor links.
+        
+        CORRECTED: Links 0-8 connect to left wheel, links 9-17 connect to right wheel
+        as specified in the paper.
         
         Args:
             sensor_readings: Dict of sensor readings from environment
             
         Returns:
-            List of wheel speeds [left_wheel, right_wheel]
+            List of wheel speeds [left_wheel, right_wheel] in [-10, 10] range
         """
         # Convert sensor readings dict to a list in the expected order
         sensor_values = [
-            sensor_readings['food_left'],
-            sensor_readings['food_right'],
-            sensor_readings['water_left'],
-            sensor_readings['water_right'],
-            sensor_readings['trap_left'],
-            sensor_readings['trap_right']
+            sensor_readings['food_left'],     # Sensor 0
+            sensor_readings['food_right'],    # Sensor 1
+            sensor_readings['water_left'],    # Sensor 2
+            sensor_readings['water_right'],   # Sensor 3
+            sensor_readings['trap_left'],     # Sensor 4
+            sensor_readings['trap_right']     # Sensor 5
         ]
         
-        # Reset wheel outputs
-        wheel_outputs = [0.0, 0.0]  # [left, right]
+        # Accumulate outputs for each wheel
+        left_wheel_sum = 0.0   # Sum of links 0-8
+        right_wheel_sum = 0.0  # Sum of links 9-17
         
-        # For each sensor and its three corresponding links
-        for sensor_idx, sensor_value in enumerate(sensor_values):
-            # Determine which wheel this sensor connects to
-            wheel_idx = self.get_sensor_to_wheel_mapping(sensor_idx)
+        # Process all 18 links (3 per sensor × 6 sensors)
+        for link_idx in range(18):
+            # Determine which sensor this link belongs to
+            sensor_idx = link_idx // 3  # Links 0-2→sensor 0, 3-5→sensor 1, etc.
+            sensor_value = sensor_values[sensor_idx]
             
-            # Each sensor has 3 parallel links
-            base_link_idx = sensor_idx * 3
+            # Compute link output
+            output = self.compute_sensor_to_wheel_output(sensor_value, link_idx)
             
-            # Compute and accumulate the output from each link
-            for offset in range(3):
-                link_idx = base_link_idx + offset
-                wheel_outputs[wheel_idx] += self.compute_sensor_to_wheel_output(sensor_value, link_idx)
+            # CORRECTED: Route to wheels based on link index, not sensor side
+            if link_idx < 9:  # Links 0-8 go to left wheel
+                left_wheel_sum += output
+            else:  # Links 9-17 go to right wheel  
+                right_wheel_sum += output
         
-        # Apply sigmoid function with evolved threshold to each wheel
-        left_wheel = self.sigmoid(wheel_outputs[0], self.sigmoid_thresholds[0])
-        right_wheel = self.sigmoid(wheel_outputs[1], self.sigmoid_thresholds[1])
+        # Apply sigmoid function with evolved thresholds and scale to [-10, 10]
+        left_wheel = self.sigmoid_to_wheel_speed(left_wheel_sum, self.sigmoid_thresholds[0])
+        right_wheel = self.sigmoid_to_wheel_speed(right_wheel_sum, self.sigmoid_thresholds[1])
         
-        # Scale to actual wheel speeds
-        self.wheel_speeds = [
-            left_wheel * settings.ANIMAT_MAX_SPEED,
-            right_wheel * settings.ANIMAT_MAX_SPEED
-        ]
+        # Store final wheel speeds (already in correct range)
+        self.wheel_speeds = [left_wheel, right_wheel]
         
         return self.wheel_speeds
         
-    def sigmoid(self, x, threshold):
-        """Compute a sigmoid function with the given threshold.
+    def sigmoid_to_wheel_speed(self, x, threshold):
+        """Convert summed link outputs to wheel speed via sigmoid.
+        
+        Paper specifies: "passed through a sigmoid function, and then scaled from -10 to 10"
         
         Args:
-            x: Input value
-            threshold: Sigmoid threshold parameter
+            x: Summed link outputs (typically in range [-9, 9])
+            threshold: Evolved sigmoid threshold ([-3.0, 3.0])
             
         Returns:
-            Sigmoid activation (-1 to 1)
+            Wheel speed in [-10, 10] range
         """
-        # The 'threshold' parameter is already scaled to a range like [-3.0, 3.0] by _scale_sigmoid_genome_value
-        # Using it directly provides a reasonable slope for the sigmoid.
-        return 1.0 / (1.0 + np.exp(-x * threshold))
+        try:
+            # Standard sigmoid [0, 1]
+            sigmoid_01 = 1.0 / (1.0 + np.exp(-(x - threshold)))
+            
+            # Scale from [0, 1] to [-10, 10] as paper specifies
+            wheel_speed = (sigmoid_01 * 2.0 - 1.0) * 10.0
+            
+            return wheel_speed
+        except OverflowError:
+            # Handle extreme values
+            if x - threshold > 500:
+                return 10.0  # Max forward
+            else:
+                return -10.0  # Max reverse
         
     def update(self, dt, environment):
         """Update the animat's state for one timestep.
@@ -421,9 +437,11 @@ class Animat:
         # Move based on wheel speeds
         self.move(dt)
         
-        # Deplete batteries
-        self.batteries[0] -= settings.BATTERY_DECAY_RATE * dt
-        self.batteries[1] -= settings.BATTERY_DECAY_RATE * dt
+        # CORRECTED: Battery decay rate from paper
+        # "decreases by 1 each time step" - assuming dt represents one timestep
+        decay_amount = settings.BATTERY_DECAY_RATE * dt
+        self.batteries[0] -= decay_amount
+        self.batteries[1] -= decay_amount
         
         # Ensure batteries don't go below 0
         self.batteries[0] = max(0, self.batteries[0])
@@ -436,20 +454,26 @@ class Animat:
     def move(self, dt):
         """Move the animat based on wheel speeds using differential drive.
         
+        CORRECTED: Paper specifies that wheel speeds +10,+10 result in 
+        "maximum speed of 2.8 units per time step"
+        
         Args:
             dt: Time delta in seconds
         """
-        # Standard differential drive kinematics
+        # Wheel speeds are already in [-10, 10] range
         left_speed = self.wheel_speeds[0]
         right_speed = self.wheel_speeds[1]
         
         # Forward velocity is average of wheel speeds
         forward_velocity = (left_speed + right_speed) / 2.0
         
+        # CORRECTED: Apply speed scaling factor from paper
+        # When both wheels = +10, forward_velocity = 10, should move 2.8 units/timestep
+        speed_scale_factor = settings.ANIMAT_MAX_SPEED / 10.0  # = 0.28
+        actual_forward_velocity = forward_velocity * speed_scale_factor
         # Angular velocity is proportional to speed difference
-        # Using the wheelbase (distance between wheels) = 2 * radius
         wheelbase = 2.0 * self.radius
-        angular_velocity = (right_speed - left_speed) / wheelbase
+        angular_velocity = (right_speed - left_speed) / wheelbase * speed_scale_factor
         
         # Update orientation first
         current_angle = np.arctan2(self.direction[1], self.direction[0])
@@ -459,13 +483,13 @@ class Animat:
         self.direction = np.array([np.cos(new_angle), np.sin(new_angle)])
         
         # Move forward in the new direction
-        self.position += forward_velocity * dt * self.direction
+        self.position += actual_forward_velocity * dt * self.direction
         
     def get_fitness(self):
-        """Calculate the fitness of this animat based on survival time.
+        """Calculate the fitness of this animat based on survival time or battery level.
         
         Returns:
-            Fitness score (survival time in seconds or battery level)
+            Fitness score (survival time in seconds or normalized battery level)
         """
         # F = (B1 + B2) / (2 * BATTERY_MAX) to align with paper's F = (B1 + B2)/400.0
         # where BATTERY_MAX from paper is 200.
@@ -479,6 +503,5 @@ class Animat:
         """
         Calculates the current forward speed of the animat.
         This is the average of its two wheel speeds.
-        The wheel speeds themselves are scaled by ANIMAT_MAX_SPEED.
         """
         return (self.wheel_speeds[0] + self.wheel_speeds[1]) / 2.0

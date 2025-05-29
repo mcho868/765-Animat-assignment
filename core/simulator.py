@@ -44,6 +44,9 @@ class Simulator:
         # Initialize logging
         self.logger = Logger()
         
+        # Camera tracking for following animats in unbounded environment
+        self.camera_offset = [0.0, 0.0]  # Camera offset for following animats
+        
         # Initialize pygame if not headless
         if not self.headless:
             pygame.init()
@@ -112,18 +115,26 @@ class Simulator:
         # Clear the screen
         self.screen.fill((255, 255, 255))
         
+        # Update camera to follow animat if needed
+        self.update_camera()
+        
         # Calculate scale factors to map from environment coordinates to screen coordinates
-        scale_x = self.width / self.environment.width
-        scale_y = self.height / self.environment.height
+        # Use object_area_size as the reference for scaling
+        scale_x = self.width / self.environment.object_area_size
+        scale_y = self.height / self.environment.object_area_size
         
         # Draw trajectory if available
         if len(self.trajectory_to_draw) >= 2:
             scaled_points = []
             for point in self.trajectory_to_draw:
-                screen_px = int(point[0] * scale_x)
-                screen_py = int(point[1] * scale_y)
-                scaled_points.append((screen_px, screen_py))
-            pygame.draw.lines(self.screen, (180, 180, 180), False, scaled_points, 2) # Light grey color, 2 pixels thick
+                # Apply camera offset to trajectory points
+                screen_px = int((point[0] - self.camera_offset[0]) * scale_x)
+                screen_py = int((point[1] - self.camera_offset[1]) * scale_y)
+                # Only add points that are visible on screen
+                if -50 <= screen_px <= self.width + 50 and -50 <= screen_py <= self.height + 50:
+                    scaled_points.append((screen_px, screen_py))
+            if len(scaled_points) >= 2:
+                pygame.draw.lines(self.screen, (180, 180, 180), False, scaled_points, 2) # Light grey color, 2 pixels thick
         
         # Render entities
         for entity in self.environment.entities:
@@ -132,56 +143,77 @@ class Simulator:
                 
             color = self.colors.get(entity.type, (0, 0, 0))
             
-            # Draw entity
-            screen_x = int(entity.position[0] * scale_x)
-            screen_y = int(entity.position[1] * scale_y)
+            # Apply camera offset to entity positions
+            screen_x = int((entity.position[0] - self.camera_offset[0]) * scale_x)
+            screen_y = int((entity.position[1] - self.camera_offset[1]) * scale_y)
             screen_radius = int(entity.radius * scale_x)  # Use scale_x for consistent scaling
             
-            pygame.draw.circle(self.screen, color, (screen_x, screen_y), screen_radius)
-            
-            # Draw entity direction if it's an animat
-            if entity.type == EntityType.ANIMAT:
-                # Draw a line showing direction
-                direction_end = (
-                    screen_x + int(entity.radius * 2 * entity.direction[0]),
-                    screen_y + int(entity.radius * 2 * entity.direction[1])
-                )
-                pygame.draw.line(self.screen, (0, 0, 0), (screen_x, screen_y), direction_end, 2)
+            # Only render entities that are visible on screen (with some margin)
+            margin = 100
+            if (-margin <= screen_x <= self.width + margin and 
+                -margin <= screen_y <= self.height + margin):
                 
-                # Draw battery levels
-                battery1_width = int(entity.batteries[0] / settings.BATTERY_MAX * 20)
-                battery2_width = int(entity.batteries[1] / settings.BATTERY_MAX * 20)
+                pygame.draw.circle(self.screen, color, (screen_x, screen_y), screen_radius)
                 
-                pygame.draw.rect(self.screen, self.colors[EntityType.FOOD], 
-                                (screen_x - 10, screen_y - entity.radius - 10, battery1_width, 3))
-                pygame.draw.rect(self.screen, self.colors[EntityType.WATER], 
-                                (screen_x - 10, screen_y - entity.radius - 5, battery2_width, 3))
-                
-                # Display battery percentages next to the bars
-                battery1_percent = int((entity.batteries[0] / settings.BATTERY_MAX) * 100)
-                battery2_percent = int((entity.batteries[1] / settings.BATTERY_MAX) * 100)
-                battery_text = self.font.render(f"L:{battery1_percent}% R:{battery2_percent}%", True, (0, 0, 0))
-                self.screen.blit(battery_text, (screen_x + 10, screen_y - entity.radius - 10))
-                
-                # Display animat speed directly below the animat in the main render view
-                forward_speed = entity.get_forward_speed()
-                speed_text_surface = self.font.render(f"Speed: {forward_speed:.2f}", True, (0, 0, 0))
-                text_width = speed_text_surface.get_width()
-                self.screen.blit(speed_text_surface, (screen_x - text_width // 2, screen_y + screen_radius + 5))
+                # Draw entity direction if it's an animat
+                if entity.type == EntityType.ANIMAT:
+                    # Draw a line showing direction
+                    direction_end = (
+                        screen_x + int(entity.radius * 2 * entity.direction[0]),
+                        screen_y + int(entity.radius * 2 * entity.direction[1])
+                    )
+                    pygame.draw.line(self.screen, (0, 0, 0), (screen_x, screen_y), direction_end, 2)
+                    
+                    # Draw battery levels
+                    battery1_width = int(entity.batteries[0] / settings.BATTERY_MAX * 20)
+                    battery2_width = int(entity.batteries[1] / settings.BATTERY_MAX * 20)
+                    
+                    pygame.draw.rect(self.screen, self.colors[EntityType.FOOD], 
+                                    (screen_x - 10, screen_y - entity.radius - 10, battery1_width, 3))
+                    pygame.draw.rect(self.screen, self.colors[EntityType.WATER], 
+                                    (screen_x - 10, screen_y - entity.radius - 5, battery2_width, 3))
+                    
+                    # Display battery percentages next to the bars
+                    battery1_percent = int((entity.batteries[0] / settings.BATTERY_MAX) * 100)
+                    battery2_percent = int((entity.batteries[1] / settings.BATTERY_MAX) * 100)
+                    battery_text = self.font.render(f"L:{battery1_percent}% R:{battery2_percent}%", True, (0, 0, 0))
+                    self.screen.blit(battery_text, (screen_x + 10, screen_y - entity.radius - 10))
+                    
+                    # Display animat speed directly below the animat in the main render view
+                    forward_speed = entity.get_forward_speed()
+                    speed_text_surface = self.font.render(f"Speed: {forward_speed:.2f}", True, (0, 0, 0))
+                    text_width = speed_text_surface.get_width()
+                    self.screen.blit(speed_text_surface, (screen_x - text_width // 2, screen_y + screen_radius + 5))
         
         # Draw performance stats
         fps_text = self.font.render(f"FPS: {int(self.clock.get_fps())}", True, (0, 0, 0))
         time_text = self.font.render(f"Time: {self.simulation_time:.1f}s", True, (0, 0, 0))
         gen_text = self.font.render(f"Generation: {self.generation}/{settings.NUM_GENERATIONS}", True, (0, 0, 0))
         
+        # Display camera position info
+        camera_text = self.font.render(f"Camera: ({self.camera_offset[0]:.1f}, {self.camera_offset[1]:.1f})", True, (0, 0, 0))
+        self.screen.blit(camera_text, (10, 50))
+        
         # Display speed for each animat
-        y_offset = 70
+        y_offset = 90
         for entity in self.environment.entities:
             if entity.type == EntityType.ANIMAT:
                 # Calculate the actual speed (magnitude of the velocity)
                 forward_speed = entity.get_forward_speed()
                 speed_text = self.font.render(f"Animat {id(entity) % 1000} Speed: {forward_speed:.2f}", True, (0, 0, 0))
                 self.screen.blit(speed_text, (10, y_offset))
+                y_offset += 20
+                
+                # Display position
+                pos_text = self.font.render(f"Position: ({entity.position[0]:.1f}, {entity.position[1]:.1f})", True, (0, 0, 0))
+                self.screen.blit(pos_text, (10, y_offset))
+                y_offset += 20
+                
+                # Display distance from center
+                center_pos = self.environment.object_area_size / 2
+                distance_from_center = np.linalg.norm(entity.position - np.array([center_pos, center_pos]))
+                dist_text = self.font.render(f"Distance from center: {distance_from_center:.1f}", True, (0, 0, 0))
+                self.screen.blit(dist_text, (10, y_offset))
                 y_offset += 20
                 
                 # Display battery percentages in the panel
@@ -210,9 +242,32 @@ class Simulator:
             x, y: Top-left coordinates of the section
             width, height: Dimensions of the section
         """
+        # Calculate camera offset for this environment
+        camera_offset = [0.0, 0.0]
+        
+        # Find the animat in this environment
+        animat = None
+        for entity in environment.entities:
+            if entity.type == EntityType.ANIMAT and entity.active:
+                animat = entity
+                break
+        
+        if animat:
+            # Check if animat is outside the original object area
+            object_area_boundary = environment.object_area_size
+            animat_pos = animat.position
+            
+            # If animat is outside the object area, center camera on animat
+            if (animat_pos[0] < 0 or animat_pos[0] > object_area_boundary or 
+                animat_pos[1] < 0 or animat_pos[1] > object_area_boundary):
+                
+                camera_offset[0] = animat_pos[0] - environment.object_area_size / 2
+                camera_offset[1] = animat_pos[1] - environment.object_area_size / 2
+        
         # Calculate scale factors to map from environment coordinates to screen coordinates
-        scale_x = width / environment.width
-        scale_y = height / environment.height
+        # Use object_area_size as the reference for scaling
+        scale_x = width / environment.object_area_size
+        scale_y = height / environment.object_area_size
         
         # Render entities
         for entity in environment.entities:
@@ -221,42 +276,44 @@ class Simulator:
                 
             color = self.colors.get(entity.type, (0, 0, 0))
             
-            # Draw entity
-            screen_x = int(x + entity.position[0] * scale_x)
-            screen_y = int(y + entity.position[1] * scale_y)
+            # Apply camera offset to entity positions
+            screen_x = int(x + (entity.position[0] - camera_offset[0]) * scale_x)
+            screen_y = int(y + (entity.position[1] - camera_offset[1]) * scale_y)
             screen_radius = int(entity.radius * scale_x)  # Use scale_x for consistent scaling
             
-            pygame.draw.circle(self.screen, color, (screen_x, screen_y), screen_radius)
-            
-            # Draw entity direction if it's an animat
-            if entity.type == EntityType.ANIMAT:
-                # Draw a line showing direction
-                direction_end = (
-                    screen_x + int(entity.radius * 2 * entity.direction[0]),
-                    screen_y + int(entity.radius * 2 * entity.direction[1])
-                )
-                pygame.draw.line(self.screen, (0, 0, 0), (screen_x, screen_y), direction_end, 2)
+            # Only render entities that are visible within this section
+            if (x <= screen_x <= x + width and y <= screen_y <= y + height):
+                pygame.draw.circle(self.screen, color, (screen_x, screen_y), screen_radius)
                 
-                # Draw battery levels
-                battery1_width = int(entity.batteries[0] / settings.BATTERY_MAX * 20)
-                battery2_width = int(entity.batteries[1] / settings.BATTERY_MAX * 20)
-                
-                pygame.draw.rect(self.screen, self.colors[EntityType.FOOD], 
-                                (screen_x - 10, screen_y - entity.radius - 10, battery1_width, 3))
-                pygame.draw.rect(self.screen, self.colors[EntityType.WATER], 
-                                (screen_x - 10, screen_y - entity.radius - 5, battery2_width, 3))
-                
-                # Display battery percentages next to the bars
-                battery1_percent = int((entity.batteries[0] / settings.BATTERY_MAX) * 100)
-                battery2_percent = int((entity.batteries[1] / settings.BATTERY_MAX) * 100)
-                battery_text = self.font.render(f"L:{battery1_percent}% R:{battery2_percent}%", True, (0, 0, 0))
-                self.screen.blit(battery_text, (screen_x + 10, screen_y - entity.radius - 10))
-                
-                # Display animat speed directly below the animat in the main render view
-                forward_speed = entity.get_forward_speed()
-                speed_text_surface = self.font.render(f"Speed: {forward_speed:.2f}", True, (0, 0, 0))
-                text_width = speed_text_surface.get_width()
-                self.screen.blit(speed_text_surface, (screen_x - text_width // 2, screen_y + screen_radius + 5))
+                # Draw entity direction if it's an animat
+                if entity.type == EntityType.ANIMAT:
+                    # Draw a line showing direction
+                    direction_end = (
+                        screen_x + int(entity.radius * 2 * entity.direction[0]),
+                        screen_y + int(entity.radius * 2 * entity.direction[1])
+                    )
+                    pygame.draw.line(self.screen, (0, 0, 0), (screen_x, screen_y), direction_end, 2)
+                    
+                    # Draw battery levels
+                    battery1_width = int(entity.batteries[0] / settings.BATTERY_MAX * 20)
+                    battery2_width = int(entity.batteries[1] / settings.BATTERY_MAX * 20)
+                    
+                    pygame.draw.rect(self.screen, self.colors[EntityType.FOOD], 
+                                    (screen_x - 10, screen_y - entity.radius - 10, battery1_width, 3))
+                    pygame.draw.rect(self.screen, self.colors[EntityType.WATER], 
+                                    (screen_x - 10, screen_y - entity.radius - 5, battery2_width, 3))
+                    
+                    # Display battery percentages next to the bars
+                    battery1_percent = int((entity.batteries[0] / settings.BATTERY_MAX) * 100)
+                    battery2_percent = int((entity.batteries[1] / settings.BATTERY_MAX) * 100)
+                    battery_text = self.font.render(f"L:{battery1_percent}% R:{battery2_percent}%", True, (0, 0, 0))
+                    self.screen.blit(battery_text, (screen_x + 10, screen_y - entity.radius - 10))
+                    
+                    # Display animat speed directly below the animat in the main render view
+                    forward_speed = entity.get_forward_speed()
+                    speed_text_surface = self.font.render(f"Speed: {forward_speed:.2f}", True, (0, 0, 0))
+                    text_width = speed_text_surface.get_width()
+                    self.screen.blit(speed_text_surface, (screen_x - text_width // 2, screen_y + screen_radius + 5))
         
         # Draw section border for clarity
         pygame.draw.rect(self.screen, (200, 200, 200), (x, y, width, height), 1)
@@ -343,9 +400,9 @@ class Simulator:
                     env = Environment()
                     env.initialize_random_environment()
                     
-                    # Create animat with the genome
-                    center_pos = (env.width/2, env.height/2)
-                    animat = Animat(center_pos, genome)
+                    # Create animat with the genome at a random position
+                    spawn_pos = env.get_random_spawn_position()
+                    animat = Animat(spawn_pos, genome)
                     env.add_entity(animat)
                     
                     environments.append(env)
@@ -522,9 +579,9 @@ class Simulator:
         self.environment = Environment()
         self.environment.initialize_random_environment()
         
-        # Create animat with the best genome
-        center_pos = (self.environment.width/2, self.environment.height/2)
-        animat = Animat(center_pos, genome)
+        # Create animat with the best genome at a random position
+        spawn_pos = self.environment.get_random_spawn_position()
+        animat = Animat(spawn_pos, genome)
         self.environment.add_entity(animat)
         
         # Run simulation loop
@@ -620,9 +677,9 @@ class Simulator:
         self.environment = Environment()
         self.environment.initialize_random_environment()
         
-        # Create animat with Seth's specific genome
-        center_pos = (self.environment.width/2, self.environment.height/2)
-        animat = Animat(center_pos, "seth")  # Special string to trigger seth genome
+        # Create animat with Seth's specific genome at a random position
+        spawn_pos = self.environment.get_random_spawn_position()
+        animat = Animat(spawn_pos, "seth")  # Special string to trigger seth genome
         self.environment.add_entity(animat)
         
         print("Seth's animat created with the following link configuration:")
@@ -680,3 +737,45 @@ class Simulator:
             print(f"Seth's animat survived the full simulation!")
             print(f"Final battery levels: Battery 1: {animat.batteries[0]:.1f}, Battery 2: {animat.batteries[1]:.1f}")
             print(f"Final fitness: {animat.get_fitness():.3f}") 
+
+    def update_camera(self):
+        """Update the camera position to follow the animat if it goes outside the object area."""
+        # Find the first active animat
+        active_animat = None
+        for entity in self.environment.entities:
+            if entity.type == EntityType.ANIMAT and entity.active:
+                active_animat = entity
+                break
+        
+        if not active_animat:
+            return
+        
+        # Check if animat is outside the original object area
+        object_area_boundary = self.environment.object_area_size
+        animat_pos = active_animat.position
+        
+        # Calculate desired camera position to center the animat
+        desired_camera_x = animat_pos[0] - self.environment.object_area_size / 2
+        desired_camera_y = animat_pos[1] - self.environment.object_area_size / 2
+        
+        # If animat is outside the object area, start following
+        if (animat_pos[0] < 0 or animat_pos[0] > object_area_boundary or 
+            animat_pos[1] < 0 or animat_pos[1] > object_area_boundary):
+            
+            # Smooth camera following
+            camera_speed = 0.1  # Adjust for smoother/faster following
+            self.camera_offset[0] += (desired_camera_x - self.camera_offset[0]) * camera_speed
+            self.camera_offset[1] += (desired_camera_y - self.camera_offset[1]) * camera_speed
+        else:
+            # If animat is back in the object area, gradually return camera to origin
+            camera_speed = 0.05
+            self.camera_offset[0] += (0 - self.camera_offset[0]) * camera_speed
+            self.camera_offset[1] += (0 - self.camera_offset[1]) * camera_speed
+
+    def follow_animat(self, animat):
+        """Follow a specific animat."""
+        self.followed_animat = animat
+
+    def unfollow_animat(self):
+        """Unfollow the current animat."""
+        self.followed_animat = None 

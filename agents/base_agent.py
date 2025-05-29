@@ -85,9 +85,21 @@ class Animat:
         genome_size = settings.GENOTYPE_SIZE
         self.genome = np.random.randint(0, 100, genome_size)
         
-        # Set battery indicators for the 9 encoded links (even=battery1, odd=battery2)
+        # Ensure thresh2 >= thresh1 for each of the 9 encoded links
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
-            # Every 9th gene indicates battery
+            thresh1_pos = i + 2  # Position of thresh1
+            thresh2_pos = i + 4  # Position of thresh2
+            
+            # If thresh2 < thresh1, adjust thresh2 to be at least thresh1
+            if self.genome[thresh2_pos] < self.genome[thresh1_pos]:
+                # Set thresh2 to be thresh1 + a random offset (0 to remaining range)
+                remaining_range = 99 - self.genome[thresh1_pos]
+                if remaining_range > 0:
+                    self.genome[thresh2_pos] = self.genome[thresh1_pos] + np.random.randint(0, remaining_range + 1)
+                else:
+                    self.genome[thresh2_pos] = self.genome[thresh1_pos]
+            
+            # Set battery indicators for the 9 encoded links (0=battery1, 1=battery2)
             self.genome[i + 8] = np.random.choice([0, 1])  # 0 for battery 1, 1 for battery 2
             
     def initialize_seth_genome(self):

@@ -91,6 +91,16 @@ class GeneticAlgorithm:
         child1 = np.concatenate((parent1[:crossover_point], parent2[crossover_point:]))
         child2 = np.concatenate((parent2[:crossover_point], parent1[crossover_point:]))
         
+        # Enforce thresh2 >= thresh1 constraint after crossover for both children
+        for child in [child1, child2]:
+            for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
+                thresh1_pos = i + 2  # Position of thresh1
+                thresh2_pos = i + 4  # Position of thresh2
+                
+                # If thresh2 < thresh1 after crossover, adjust thresh2
+                if child[thresh2_pos] < child[thresh1_pos]:
+                    child[thresh2_pos] = child[thresh1_pos]
+        
         return child1, child2
         
     def mutate(self, genome):
@@ -114,7 +124,16 @@ class GeneticAlgorithm:
                     # For other genes, add a random value between -10 and 10
                     mutated_genome[i] += random.randint(-10, 10)
                     # Keep values in appropriate ranges
-                    mutated_genome[i] = max(-50, min(50, mutated_genome[i]))
+                    mutated_genome[i] = max(0, min(99, mutated_genome[i]))
+                    
+        # Enforce thresh2 >= thresh1 constraint after mutation
+        for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
+            thresh1_pos = i + 2  # Position of thresh1
+            thresh2_pos = i + 4  # Position of thresh2
+            
+            # If thresh2 < thresh1 after mutation, adjust thresh2
+            if mutated_genome[thresh2_pos] < mutated_genome[thresh1_pos]:
+                mutated_genome[thresh2_pos] = mutated_genome[thresh1_pos]
                     
         return mutated_genome
         
@@ -175,14 +194,15 @@ def simulate_animat(genome, max_steps=settings.ANIMAT_MAX_LIFESPAN):
     env = Environment()
     env.initialize_random_environment()
     
-    # Create animat with the genome
-    animat = Animat((env.width/2, env.height/2), genome)
+    # Create animat with the genome at a random spawn position
+    spawn_position = env.get_random_spawn_position()
+    animat = Animat(spawn_position, genome)
     env.add_entity(animat)
     
     # Run simulation
     step = 0
     while animat.active and step < max_steps:
-        env.update(1)  # Changed from 1 to 0.1 seconds per step
+        env.update(1)  # Time step per update
         step += 1
         
     # Calculate fitness

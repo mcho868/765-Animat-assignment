@@ -28,7 +28,7 @@ ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 POPULATION_SIZE = 100
 MUTATION_RATE = 0.04  # 4% per bit (Note: current mutation is per-gene)
 CROSSOVER_RATE = 0.5
-NUM_GENERATIONS = 300
+NUM_GENERATIONS = 1
 TOURNAMENT_SIZE = 5
 
 #Sensorimotor link settings

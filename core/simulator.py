@@ -192,7 +192,7 @@ class Simulator:
         
         # Display camera position info
         camera_text = self.font.render(f"Camera: ({self.camera_offset[0]:.1f}, {self.camera_offset[1]:.1f})", True, (0, 0, 0))
-        self.screen.blit(camera_text, (10, 50))
+        self.screen.blit(camera_text, (10, 70))
         
         # Display speed for each animat
         y_offset = 90

@@ -71,74 +71,29 @@ class Animat:
         
     def initialize_random_genome(self):
         """Initialize a random genome for the animat.
-        
         Only 9 links are genetically specified due to left-right symmetry.
         The genome encodes links for left-side sensors, and right-side links are mirrored.
         """
-        # Genome format (per link):
-        # [offset, grad1, thresh1, grad2, thresh2, grad3, slope_mod, offset_mod, battery]
-        # Final 2 genes are sigmoid thresholds for wheels
-        
+        # Genome format (per link): [weight, bias], final 2 genes are sigmoid thresholds for wheels
         genome_size = settings.GENOTYPE_SIZE
         self.genome = np.random.randint(0, 100, genome_size)
-        
-        # Set battery indicators for the 9 encoded links (even=battery1, odd=battery2)
-        for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
-            # Every 9th gene indicates battery
-            self.genome[i + 8] = np.random.choice([0, 1])  # 0 for battery 1, 1 for battery 2
-            
+
     def parse_genome(self):
         """Parse the genome into sensorimotor links with left-right symmetry enforcement.
-        
         The genome encodes links for left-side sensors, and right-side links are mirrored.
         """
         self.links = []
         encoded_links = []
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
-            # Scale offset (0-99 to -100 to +100)
-            offset_val = self._scale_genome_value(self.genome[i], -100.0, 100.0)
-
-            # Scale gradients (0-99 to -pi/2 to +pi/2, then tan)
-            angle1 = (self.genome[i + 1] / 99.0) * np.pi - (np.pi / 2.0)
-            angle1 = np.clip(angle1, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
-            grad1_val = np.tan(angle1)
-
-            # Scale threshold 1 (0-99 to -100 to +100)
-            thresh1_val = self._scale_genome_value(self.genome[i + 2], -100.0, 100.0)
-
-            angle2 = (self.genome[i + 3] / 99.0) * np.pi - (np.pi / 2.0)
-            angle2 = np.clip(angle2, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
-            grad2_val = np.tan(angle2)
-
-            # Scale raw thresh2 value first (0-99 to -100 to +100)
-            thresh2_raw_scaled = self._scale_genome_value(self.genome[i + 4], -100.0, 100.0)
-            # Enforce that the second threshold must follow the first
-            thresh2_val = max(thresh1_val, thresh2_raw_scaled)
-
-            angle3 = (self.genome[i + 5] / 99.0) * np.pi - (np.pi / 2.0)
-            angle3 = np.clip(angle3, -np.pi/2.0 * 0.99, np.pi/2.0 * 0.99)
-            grad3_val = np.tan(angle3)
-
-            # Slope and offset modulation degrees (paper does not explicitly scale these beyond being 0-99 derived)
-            # Current code uses / 10.0. Retaining this specific scaling.
-            slope_mod_val = self.genome[i + 6] / 10.0
-            offset_mod_val = self.genome[i + 7] / 10.0
-            
-            battery_val = self.genome[i + 8] # Already 0 or 1, used directly
-
+            # Scale weight (0-99 to -1.0 to 1.0)
+            weight = self._scale_genome_value(self.genome[i], -1.0, 1.0)
+            # Scale bias (0-99 to -0.5 to 0.5)
+            bias = self._scale_genome_value(self.genome[i + 1], -0.5, 0.5)
             link_params = {
-                'offset': offset_val,
-                'grad1': grad1_val,
-                'thresh1': thresh1_val,
-                'grad2': grad2_val,
-                'thresh2': thresh2_val,
-                'grad3': grad3_val,
-                'slope_mod': slope_mod_val,
-                'offset_mod': offset_mod_val,
-                'battery': battery_val,
+                'weight': weight,
+                'bias': bias
             }
             encoded_links.append(link_params)
-        
         # Now create the full links with symmetry
         num_sensors = settings.NUM_SENSORS
         for sensor_idx in range(num_sensors):
@@ -150,6 +105,7 @@ class Animat:
                     left_sensor_idx = sensor_idx - 1
                     encoded_idx = (left_sensor_idx // 2) * 3 + link_offset
                     self.links.append(encoded_links[encoded_idx].copy())
+
     def get_sensor_to_wheel_mapping(self, sensor_index):
         """Determine which wheel a sensor connects to based on side.
         
@@ -163,36 +119,17 @@ class Animat:
         
     def compute_sensor_to_wheel_output(self, sensor_value, link_index):
         """Compute the output of a sensorimotor link.
-        
         Args:
             sensor_value: Current sensor reading (0-100)
             link_index: Index of the link to use
-            
         Returns:
             Output value contribution to wheel
         """
         link = self.links[link_index]
-        
-        # Determine which battery influences this link
-        battery_level = self.batteries[link['battery']]
-        battery_factor = battery_level / settings.BATTERY_MAX  # 0-1 normalized
-        
-        # Apply battery modulation to parameters
-        slope = link['grad1']
-        if sensor_value > link['thresh1']:
-            slope = link['grad2']
-        if sensor_value > link['thresh2']:
-            slope = link['grad3']
-        
-        # Apply battery modulation to slope and offset
-        modulated_slope = slope + (link['slope_mod'] * battery_factor)
-        modulated_offset = link['offset'] + (link['offset_mod'] * battery_factor)
-        
-        # Compute output
-        output = modulated_offset + (modulated_slope * sensor_value)
-        
-        # Limit output to range [-1, 1]
-        return max(-1.0, min(1.0, output))
+        weight = link['weight']
+        bias = link['bias']
+        output = (sensor_value * weight) + bias
+        return output
         
     def compute_wheel_speed(self, sensor_readings):
         """Compute wheel speeds based on sensor readings and sensorimotor links.
@@ -258,8 +195,19 @@ class Animat:
         # Get sensor readings from environment
         sensor_readings = environment.get_sensor_readings(self)
         
+        # Debug: Print sensor values and wheel speeds for first 3 animats and first 10 steps
+        if hasattr(self, 'debug_id') and self.debug_id < 3:
+            if not hasattr(self, 'debug_step'):
+                self.debug_step = 0
+            if self.debug_step < 10:
+                print(f"Animat {self.debug_id} Step {self.debug_step}: Sensors: {sensor_readings}")
+        
         # Compute wheel speeds
         self.compute_wheel_speed(sensor_readings)
+        
+        if hasattr(self, 'debug_id') and self.debug_id < 3 and hasattr(self, 'debug_step') and self.debug_step < 10:
+            print(f"Animat {self.debug_id} Step {self.debug_step}: Wheel speeds: {self.wheel_speeds}")
+            self.debug_step += 1
         
         # Move based on wheel speeds
         self.move(dt)

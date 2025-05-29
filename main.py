@@ -64,7 +64,6 @@ def main():
     
     if args.visualize_evolution:
         # Visualization specific settings for run_evolution_with_visualization
-        # These could be hardcoded or moved to config.py if they are fixed
         parallel_viz_default = 100 # Default if not specified elsewhere
         speed_multiplier_default = 1000 # Default if not specified elsewhere
         
@@ -72,10 +71,18 @@ def main():
         best_genome, best_fitness = simulator.run_evolution_with_visualization(
             args.generations, parallel_count=parallel_viz_default, speed_multiplier=speed_multiplier_default)
         
-        # Optionally, run the best animat after visualization
-        # This part can be kept or removed based on desired behavior after visualized evolution
-        print("Running simulation with best evolved animat after visualization")
-        simulator.run_best_animat(best_genome, max_time=6000, speed_multiplier=10) # Example parameters
+        # Simulate and plot the trajectory of the average agent in the last generation
+        fitnesses = simulator.ga.fitnesses
+        population = simulator.ga.population
+        if fitnesses and population:
+            avg_fitness = np.mean(fitnesses)
+            avg_idx = int(np.argmin([abs(f - avg_fitness) for f in fitnesses]))
+            avg_genome = population[avg_idx]
+            print(f"Simulating and visualizing the trajectory of the average agent (fitness={fitnesses[avg_idx]:.3f})...")
+            simulator.run_best_animat(avg_genome, max_time=60, speed_multiplier=1.0)
+            simulator.plot_best_trajectory()
+        else:
+            print('No fitness or population data available for the last generation.')
     
     print(f"Evolution complete! Best fitness: {best_fitness:.2f}")
     

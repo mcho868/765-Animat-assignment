@@ -52,10 +52,11 @@ class Simulator:
         settings.TRAP_COUNT = trap_count
         settings.SENSOR_RANGE = sensor_range
         # Window size for visualization
+        min_window_size = 1000
         if width is None:
-            width = env_size
+            width = max(env_size, min_window_size)
         if height is None:
-            height = env_size
+            height = max(env_size, min_window_size)
         if headless is None:
             headless = settings.HEADLESS_MODE
         self.width = width
@@ -641,3 +642,21 @@ class Simulator:
         """Reset the simulation."""
         self.environment = Environment()
         self.simulation_time = 0 
+
+    def plot_best_trajectory(self):
+        import matplotlib.pyplot as plt
+        if not self.trajectory_to_draw:
+            print("No trajectory data to plot.")
+            return
+        xs, ys = zip(*self.trajectory_to_draw)
+        plt.figure(figsize=(8, 8))
+        plt.plot(xs, ys, marker='o', markersize=2, linewidth=1, label='Best Agent Trajectory')
+        plt.title('Trajectory of Best Agent in Last Generation')
+        plt.xlabel('X Position')
+        plt.ylabel('Y Position')
+        plt.legend()
+        plt.grid(True)
+        plt.axis('equal')
+        plt.savefig('best_agent_trajectory.png')
+        print('Best agent trajectory saved to best_agent_trajectory.png')
+        plt.show() 

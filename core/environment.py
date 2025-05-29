@@ -305,6 +305,8 @@ class Environment:
                 elif entity.type == EntityType.TRAP:
                     # Animat dies
                     animat.active = False
+                    animat.batteries[0]= 0
+                    animat.batteries[1]= 0  # Deplete both batteries
                     
             # Battery decay if animats are close
             if self.num_animats > 1:

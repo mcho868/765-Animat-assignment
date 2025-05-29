@@ -103,19 +103,17 @@ class GeneticAlgorithm:
             Mutated genome
         """
         mutated_genome = genome.copy()
-        
         for i in range(len(mutated_genome)):
             # Apply mutation with probability mutation_rate
             if random.random() < self.mutation_rate:
-                # Battery genes (every 9th gene) can only be 0 or 1
-                if (i % settings.LINK_PARAM_COUNT == 8) and (i < settings.NUM_LINKS * settings.LINK_PARAM_COUNT):
-                    mutated_genome[i] = 1 - mutated_genome[i]  # Flip 0 to 1 or 1 to 0
+                # For weight and bias genes (all except last 2): small step mutation
+                if i < settings.NUM_LINKS * settings.LINK_PARAM_COUNT:
+                    mutated_genome[i] += random.randint(-3, 3)
                 else:
-                    # For other genes, add a random value between -10 and 10
+                    # For sigmoid thresholds, keep previous mutation
                     mutated_genome[i] += random.randint(-10, 10)
-                    # Keep values in appropriate ranges
-                    mutated_genome[i] = max(-50, min(50, mutated_genome[i]))
-                    
+                # Clamp to [0, 99]
+                mutated_genome[i] = max(0, min(99, mutated_genome[i]))
         return mutated_genome
         
     def evolve_generation(self):

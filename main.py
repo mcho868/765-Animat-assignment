@@ -78,7 +78,7 @@ def main():
         print("Running simulation with best evolved animat after visualization")
 
         for i in range(10):
-            simulator.run_best_animat(best_genome, max_time=6000, speed_multiplier=10) # Example parameters
+            simulator.run_best_animat(best_genome, max_time=6000, speed_multiplier=1) # Example parameters
     
     print(f"Evolution complete! Best fitness: {best_fitness:.2f}")
     

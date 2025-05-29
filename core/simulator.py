@@ -435,7 +435,7 @@ class Simulator:
                 
                 max_total_sim_steps = settings.ANIMAT_MAX_LIFESPAN # Total 0.1s ticks for an animat
                 accumulated_sim_steps = 0 # Tracks total 0.1s ticks simulated for this batch
-                SIMULATION_TIMESTEP = 1 # Fixed duration of one simulation update
+                SIMULATION_TIMESTEP = 0.1 # Fixed duration of one simulation update
 
                 # Determine num_sim_steps_this_frame and visual_delay_ms
                 num_sim_steps_this_frame = 1
@@ -758,7 +758,7 @@ class Simulator:
         self.capture_markers = []  # Clear previous capture markers
         
         # Use fixed timestep like in the evolution simulation
-        SIMULATION_TIMESTEP = 0.1  # Fixed 0.1 second timestep
+        SIMULATION_TIMESTEP = 1  # Fixed 0.1 second timestep
         step_count = 0
         max_steps = int(max_time / SIMULATION_TIMESTEP)
         

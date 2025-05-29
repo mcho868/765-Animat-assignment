@@ -504,4 +504,6 @@ class Animat:
         Calculates the current forward speed of the animat.
         This is the average of its two wheel speeds.
         """
-        return (self.wheel_speeds[0] + self.wheel_speeds[1]) / 2.0
+        speed_scale_factor = settings.ANIMAT_MAX_SPEED / 10.0  # = 0.28
+        actual_forward_velocity = (self.wheel_speeds[0] + self.wheel_speeds[1]) / 2.0 * speed_scale_factor
+        return actual_forward_velocity

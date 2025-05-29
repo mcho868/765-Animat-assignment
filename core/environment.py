@@ -50,6 +50,29 @@ class Trap(Entity):
 
 class Environment:
     """The 2D environment containing all entities."""
+
+    def place_entity_without_overlap(self, entity_class):
+        """Place an entity in a random location avoiding overlap with existing entities."""
+        max_attempts = 1000
+        padding = settings.OBJECT_PLACEMENT_PADDING
+        radius = settings.SOURCE_SIZE
+        for _ in range(max_attempts):
+            x = random.randint(padding, self.width - padding)
+            y = random.randint(padding, self.height - padding)
+            position = np.array((x, y), dtype=float)
+
+            # Check for overlap
+            overlaps = False
+            for e in self.entities:
+                dist = np.linalg.norm(position - e.position)
+                if dist < (radius + e.radius + 2):  # 2 is small buffer distance
+                    overlaps = True
+                    break
+
+            if not overlaps:
+                return entity_class(position)
+
+        raise RuntimeError(f"Couldn't place entity without overlap after {max_attempts} attempts.")
     
     def __init__(self, width=settings.ENV_SIZE, height=settings.ENV_SIZE):
         """Initialize the environment.
@@ -90,30 +113,21 @@ class Environment:
         self.traps = []
         
         padding = settings.OBJECT_PLACEMENT_PADDING
-        
+
         # Add food sources
         for _ in range(settings.FOOD_COUNT):
-            position = (
-                random.randint(padding, self.width - padding),
-                random.randint(padding, self.height - padding)
-            )
-            self.add_entity(FoodSource(position))
-        
+            food = self.place_entity_without_overlap(FoodSource)
+            self.add_entity(food)
+
         # Add water sources
         for _ in range(settings.WATER_COUNT):
-            position = (
-                random.randint(padding, self.width - padding),
-                random.randint(padding, self.height - padding)
-            )
-            self.add_entity(WaterSource(position))
-        
+            water = self.place_entity_without_overlap(WaterSource)
+            self.add_entity(water)
+
         # Add traps
         for _ in range(settings.TRAP_COUNT):
-            position = (
-                random.randint(padding, self.width - padding),
-                random.randint(padding, self.height - padding)
-            )
-            self.add_entity(Trap(position))
+            trap = self.place_entity_without_overlap(Trap)
+            self.add_entity(trap)
     
     def check_collision(self, position, radius, exclude_entity=None):
         """Check if a position collides with any entity.
@@ -266,16 +280,19 @@ class Environment:
                     animat.batteries[0] = settings.BATTERY_MAX
                     # Make food disappear and reappear at random location
                     self.respawn_entity(entity)
+                    animat.food_collected += 1
                     
                 elif entity.type == EntityType.WATER:
                     # Replenish battery 2
                     animat.batteries[1] = settings.BATTERY_MAX
                     # Make water disappear and reappear at random location
                     self.respawn_entity(entity)
+                    animat.water_collected += 1
                     
                 elif entity.type == EntityType.TRAP:
                     # Animat dies
                     animat.active = False
+                    animat.killed_by_trap = True
                     
             # Check if batteries are depleted
             if animat.batteries[0] <= 0 and animat.batteries[1] <= 0:

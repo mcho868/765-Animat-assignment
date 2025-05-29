@@ -5,6 +5,7 @@ import numpy as np
 from config import settings
 from core.environment import EntityType
 
+
 class Animat:
     """
     Animat class implementing a simple agent with:
@@ -37,6 +38,9 @@ class Animat:
         self.radius = settings.ANIMAT_SIZE
         self.active = True
         self.type = EntityType.ANIMAT
+        self.killed_by_trap = False
+        self.food_collected = 0
+        self.water_collected = 0
         
         # Initialize direction (heading)
         if direction is None:
@@ -317,16 +321,28 @@ class Animat:
         
         # Move forward in the direction of travel
         self.position += forward_speed * dt * self.direction
-        
+
     def get_fitness(self):
-        """Calculate the fitness of this animat based on battery levels.
-        
-        Returns:
-            Fitness score (normalized according to paper, 0-1 range)
         """
-        # F = (B1 + B2) / (2 * BATTERY_MAX) to align with paper's F = (B1 + B2)/400.0
-        # where BATTERY_MAX from paper is 200.
-        return (self.batteries[0] + self.batteries[1]) / (2.0 * settings.BATTERY_MAX)
+        Calculate the fitness of this animat based on collected food/water,
+        penalizing if killed by trap.
+
+        Returns:
+            Fitness score (0-1 range)
+        """
+        total_items = settings.FOOD_COUNT + settings.WATER_COUNT
+        collected = getattr(self, "food_collected", 0) + getattr(self, "water_collected", 0)
+
+        if total_items == 0:
+            return 0.0
+
+        base_fitness = collected / total_items
+
+        if getattr(self, "killed_by_trap", False):
+            base_fitness -= 0.00
+
+        return max(0.0, base_fitness)
+
 
     def get_forward_speed(self):
         """

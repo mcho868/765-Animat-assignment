@@ -295,6 +295,7 @@ class Animat:
                     left_sensor_idx = sensor_idx - 1
                     encoded_idx = (left_sensor_idx // 2) * 3 + link_offset
                     self.links.append(encoded_links[encoded_idx].copy())
+
     def get_sensor_to_wheel_mapping(self, sensor_index):
         """Determine which wheel a sensor connects to based on side.
         
@@ -309,38 +310,34 @@ class Animat:
         return sensor_index % 2
         
     def compute_sensor_to_wheel_output(self, sensor_value, link_index):
-        """Compute the output of a sensorimotor link.
-        
-        Args:
-            sensor_value: Current sensor reading (0-100)
-            link_index: Index of the link to use
-            
-        Returns:
-            Output value contribution to wheel
-        """
+        """Compute the output of a sensorimotor link."""
         link = self.links[link_index]
         
-        # Determine which battery influences this link
+        # Get battery modulation
         battery_level = self.batteries[link['battery']]
-        battery_factor = battery_level / settings.BATTERY_MAX  # 0-1 normalized
         
-        # Apply battery modulation to parameters
-        slope = link['grad1']
-        if sensor_value > link['thresh1']:
-            slope = link['grad2']
-        if sensor_value > link['thresh2']:
-            slope = link['grad3']
+        # Apply battery modulation (as in plotting script)
+        offset_modulation = (battery_level / 2.0) * link['offset_mod']
+        slope_modulation_factor = ((battery_level - 100.0) / 100.0) * link['slope_mod']
         
-        # Apply battery modulation to slope and offset
-        modulated_slope = slope + (link['slope_mod'] * battery_factor)
-        modulated_offset = link['offset'] + (link['offset_mod'] * battery_factor)
+        # Compute base piecewise linear function (maintaining continuity)
+        if sensor_value <= link['thresh1']:
+            output = link['offset'] + link['grad1'] * sensor_value
+        elif sensor_value <= link['thresh2']:
+            y1 = link['offset'] + link['grad1'] * link['thresh1']
+            output = y1 + link['grad2'] * (sensor_value - link['thresh1'])
+        else:
+            y1 = link['offset'] + link['grad1'] * link['thresh1']
+            y2 = y1 + link['grad2'] * (link['thresh2'] - link['thresh1'])
+            output = y2 + link['grad3'] * (sensor_value - link['thresh2'])
         
-        # Compute output
-        output = modulated_offset + (modulated_slope * sensor_value)
+        # Apply battery modulation
+        output += offset_modulation
+        output += output * slope_modulation_factor
         
         # Limit output to range [-1, 1]
         return max(-1.0, min(1.0, output))
-        
+            
     def compute_wheel_speed(self, sensor_readings):
         """Compute wheel speeds based on sensor readings and sensorimotor links.
         
@@ -400,7 +397,7 @@ class Animat:
         """
         # The 'threshold' parameter is already scaled to a range like [-3.0, 3.0] by _scale_sigmoid_genome_value
         # Using it directly provides a reasonable slope for the sigmoid.
-        return 2.0 / (1.0 + np.exp(-x * threshold)) - 1.0
+        return 1.0 / (1.0 + np.exp(-x * threshold))
         
     def update(self, dt, environment):
         """Update the animat's state for one timestep.

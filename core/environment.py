@@ -88,30 +88,19 @@ class Environment:
         self.water_sources = []
         self.traps = []
         
-        padding = settings.OBJECT_PLACEMENT_PADDING
-        
         # Add food sources within the object placement area
         for _ in range(settings.FOOD_COUNT):
-            position = (
-                random.randint(padding, self.object_area_size - padding),
-                random.randint(padding, self.object_area_size - padding)
-            )
+            position = self.get_random_spawn_position(radius=settings.SOURCE_SIZE)
             self.add_entity(FoodSource(position))
         
         # Add water sources within the object placement area
         for _ in range(settings.WATER_COUNT):
-            position = (
-                random.randint(padding, self.object_area_size - padding),
-                random.randint(padding, self.object_area_size - padding)
-            )
+            position = self.get_random_spawn_position(radius=settings.SOURCE_SIZE)
             self.add_entity(WaterSource(position))
         
         # Add traps within the object placement area
         for _ in range(settings.TRAP_COUNT):
-            position = (
-                random.randint(padding, self.object_area_size - padding),
-                random.randint(padding, self.object_area_size - padding)
-            )
+            position = self.get_random_spawn_position(radius=settings.SOURCE_SIZE)
             self.add_entity(Trap(position))
     
     def check_collision(self, position, radius, exclude_entity=None):
@@ -211,17 +200,13 @@ class Environment:
         Args:
             entity: The entity to respawn
         """
-        # Generate new random position within the object placement area
-        padding = settings.OBJECT_PLACEMENT_PADDING
-        new_position = (
-            random.randint(padding, self.object_area_size - padding),
-            random.randint(padding, self.object_area_size - padding)
-        )
+        # Get a new non-overlapping position
+        new_position = self.get_random_spawn_position(radius=entity.radius)
         
         # Update entity position
         entity.position = np.array(new_position, dtype=float)
-        
-    def get_random_spawn_position(self, radius=settings.ANIMAT_SIZE, max_attempts=50):
+    
+    def get_random_spawn_position(self, radius=settings.ANIMAT_SIZE, max_attempts=100):
         """Get a random spawn position that doesn't overlap with existing entities.
         
         Args:
@@ -233,7 +218,7 @@ class Environment:
         """
         padding = settings.OBJECT_PLACEMENT_PADDING
         
-        for _ in range(max_attempts):
+        for attempt in range(max_attempts):
             # Generate random position within the object placement area
             x = random.randint(padding + radius, self.object_area_size - padding - radius)
             y = random.randint(padding + radius, self.object_area_size - padding - radius)
@@ -245,8 +230,23 @@ class Environment:
             if not collision:
                 return position
         
-        # If we couldn't find a non-overlapping position, return a position at the center
-        # (this ensures we always return a valid position even in crowded environments)
+        # If we couldn't find a non-overlapping position after many attempts,
+        # try to find a position with minimal overlap or fallback to center
+        # print(f"Warning: Could not find non-overlapping position after {max_attempts} attempts. Using fallback.")
+        
+        # Try a few more positions with smaller radius requirement (allow closer placement)
+        for attempt in range(20):
+            x = random.randint(padding + radius, self.object_area_size - padding - radius)
+            y = random.randint(padding + radius, self.object_area_size - padding - radius)
+            position = (x, y)
+            
+            # Check with reduced collision radius (allow tighter packing)
+            collision, _ = self.check_collision(position, radius * 0.8)
+            
+            if not collision:
+                return position
+        
+        # Final fallback: return center position (this ensures we always return a valid position)
         return (self.object_area_size / 2, self.object_area_size / 2)
     
     def update(self, dt):
@@ -290,4 +290,48 @@ class Environment:
                     
             # Check if batteries are depleted
             if animat.batteries[0] <= 0 and animat.batteries[1] <= 0:
-                animat.active = False 
+                animat.active = False
+    
+    def check_all_entities_for_overlaps(self):
+        """Check if any entities overlap with each other.
+        
+        Returns:
+            List of tuples (entity1, entity2, overlap_distance) for overlapping entities
+        """
+        overlaps = []
+        
+        for i, entity1 in enumerate(self.entities):
+            if not entity1.active:
+                continue
+                
+            for j, entity2 in enumerate(self.entities[i+1:], i+1):
+                if not entity2.active:
+                    continue
+                    
+                # Calculate distance between entities
+                distance = np.linalg.norm(entity1.position - entity2.position)
+                required_distance = entity1.radius + entity2.radius
+                
+                if distance < required_distance:
+                    overlap_distance = required_distance - distance
+                    overlaps.append((entity1, entity2, overlap_distance))
+        
+        return overlaps
+    
+    def print_entity_layout_info(self):
+        """Print information about entity placement for debugging."""
+        print(f"Environment layout info:")
+        print(f"- Environment size: {self.object_area_size}x{self.object_area_size}")
+        print(f"- Total entities: {len(self.entities)}")
+        print(f"- Food sources: {len(self.food_sources)}")
+        print(f"- Water sources: {len(self.water_sources)}")
+        print(f"- Traps: {len(self.traps)}")
+        print(f"- Animats: {len(self.animats)}")
+        
+        overlaps = self.check_all_entities_for_overlaps()
+        if overlaps:
+            print(f"WARNING: Found {len(overlaps)} overlapping entity pairs:")
+            for entity1, entity2, overlap_dist in overlaps:
+                print(f"  - {entity1.type.name} at {entity1.position} overlaps with {entity2.type.name} at {entity2.position} by {overlap_dist:.2f} units")
+        else:
+            print("✓ No entity overlaps detected") 

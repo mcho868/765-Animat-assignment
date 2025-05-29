@@ -21,7 +21,7 @@ SOURCE_SIZE = 16
 ANIMAT_MAX_SPEED = 2.8
 SENSOR_RANGE = 200
 BATTERY_MAX = 200  # Paper specifies maximum and initial level of 200
-BATTERY_DECAY_RATE = 0.5  # Paper specifies decreases by 1 each time step
+BATTERY_DECAY_RATE = 0.25  # Paper specifies decreases by 1 each time step
 ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 
 #Genetic algorithm settings

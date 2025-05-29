@@ -45,7 +45,7 @@ class Simulator:
         self.logger = Logger()
         
         # Camera tracking for following animats in unbounded environment
-        self.camera_offset = [0.0, 0.0]  # Camera offset for following animats
+        self.camera_offset = [0.0, 0.0]
         
         # Initialize pygame if not headless
         if not self.headless:
@@ -76,6 +76,7 @@ class Simulator:
             'min_fitness': []
         }
         self.trajectory_to_draw = [] # For drawing agent trajectory
+        self.capture_markers = []  # For marking food/water capture events [(x, y, type), ...]
         
     def initialize_ga(self):
         """Initialize the genetic algorithm."""
@@ -135,6 +136,24 @@ class Simulator:
                     scaled_points.append((screen_px, screen_py))
             if len(scaled_points) >= 2:
                 pygame.draw.lines(self.screen, (180, 180, 180), False, scaled_points, 2) # Light grey color, 2 pixels thick
+        
+        # Draw capture markers (food/water capture events)
+        for marker in self.capture_markers:
+            marker_x, marker_y, marker_type = marker
+            # Apply camera offset to marker positions
+            screen_mx = int((marker_x - self.camera_offset[0]) * scale_x)
+            screen_my = int((marker_y - self.camera_offset[1]) * scale_y)
+            
+            # Only draw markers that are visible on screen
+            if -20 <= screen_mx <= self.width + 20 and -20 <= screen_my <= self.height + 20:
+                if marker_type == EntityType.FOOD:
+                    # Draw a green X mark for food capture
+                    pygame.draw.line(self.screen, (0, 200, 0), (screen_mx - 5, screen_my - 5), (screen_mx + 5, screen_my + 5), 3)
+                    pygame.draw.line(self.screen, (0, 200, 0), (screen_mx - 5, screen_my + 5), (screen_mx + 5, screen_my - 5), 3)
+                elif marker_type == EntityType.WATER:
+                    # Draw a blue X mark for water capture
+                    pygame.draw.line(self.screen, (0, 0, 200), (screen_mx - 5, screen_my - 5), (screen_mx + 5, screen_my + 5), 3)
+                    pygame.draw.line(self.screen, (0, 0, 200), (screen_mx - 5, screen_my + 5), (screen_mx + 5, screen_my - 5), 3)
         
         # Render entities
         for entity in self.environment.entities:
@@ -589,7 +608,7 @@ class Simulator:
         self.simulation_time = 0
         last_time = time.time()
         self.trajectory_to_draw = [] # Clear previous trajectory
-        MAX_TRAJECTORY_POINTS = 500 # Max points to store for trajectory
+        self.capture_markers = []  # Clear previous capture markers
         
         while self.is_running:
             # Calculate delta time
@@ -607,14 +626,25 @@ class Simulator:
             if not self.handle_events():
                 self.is_running = False
                 break
+            
+            # Store previous battery levels to detect capture events
+            prev_battery1 = animat.batteries[0]
+            prev_battery2 = animat.batteries[1]
                 
             # Update simulation
             self.update(dt)
             
-            # Add current animat position to trajectory
+            # Check for food/water capture events by detecting battery level changes
+            if animat.active and (animat.batteries[0] > prev_battery1 or animat.batteries[1] > prev_battery2):
+                if animat.batteries[0] > prev_battery1:
+                    # Food was captured (battery 1 recharged)
+                    self.capture_markers.append((animat.position[0], animat.position[1], EntityType.FOOD))
+                if animat.batteries[1] > prev_battery2:
+                    # Water was captured (battery 2 recharged)
+                    self.capture_markers.append((animat.position[0], animat.position[1], EntityType.WATER))
+            
+            # Add current animat position to trajectory (no length limit now)
             if animat.active:
-                if len(self.trajectory_to_draw) >= MAX_TRAJECTORY_POINTS:
-                    self.trajectory_to_draw.pop(0) # Remove oldest point
                 self.trajectory_to_draw.append(tuple(animat.position))
 
             # Render
@@ -693,7 +723,7 @@ class Simulator:
         self.simulation_time = 0
         last_time = time.time()
         self.trajectory_to_draw = []  # Clear previous trajectory
-        MAX_TRAJECTORY_POINTS = 500
+        self.capture_markers = []  # Clear previous capture markers
         
         # Use fixed timestep like in the evolution simulation
         SIMULATION_TIMESTEP = 0.1  # Fixed 0.1 second timestep
@@ -705,16 +735,27 @@ class Simulator:
             if not self.handle_events():
                 self.is_running = False
                 break
+            
+            # Store previous battery levels to detect capture events
+            prev_battery1 = animat.batteries[0]
+            prev_battery2 = animat.batteries[1]
                 
             # Update simulation with fixed timestep
             self.environment.update(SIMULATION_TIMESTEP)
             self.simulation_time += SIMULATION_TIMESTEP
             step_count += 1
             
-            # Add current animat position to trajectory
+            # Check for food/water capture events by detecting battery level changes
+            if animat.active and (animat.batteries[0] > prev_battery1 or animat.batteries[1] > prev_battery2):
+                if animat.batteries[0] > prev_battery1:
+                    # Food was captured (battery 1 recharged)
+                    self.capture_markers.append((animat.position[0], animat.position[1], EntityType.FOOD))
+                if animat.batteries[1] > prev_battery2:
+                    # Water was captured (battery 2 recharged)
+                    self.capture_markers.append((animat.position[0], animat.position[1], EntityType.WATER))
+            
+            # Add current animat position to trajectory (no length limit now)
             if animat.active:
-                if len(self.trajectory_to_draw) >= MAX_TRAJECTORY_POINTS:
-                    self.trajectory_to_draw.pop(0)  # Remove oldest point
                 self.trajectory_to_draw.append(tuple(animat.position))
 
             # Render

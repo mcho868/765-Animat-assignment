@@ -19,16 +19,16 @@ TRAP_COUNT = 9
 ANIMAT_SIZE = 5
 SOURCE_SIZE = 16
 ANIMAT_MAX_SPEED = 2.8
-SENSOR_RANGE = 200
+SENSOR_RANGE = 100
 BATTERY_MAX = 200  # Paper specifies maximum and initial level of 200
-BATTERY_DECAY_RATE = 1.0  # Paper specifies decreases by 1 each time step
+BATTERY_DECAY_RATE = 0.5  # Paper specifies decreases by 1 each time step
 ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
 
 #Genetic algorithm settings
 POPULATION_SIZE = 100
 MUTATION_RATE = 0.04  # 4% per bit (Note: current mutation is per-gene)
 CROSSOVER_RATE = 0.5
-NUM_GENERATIONS = 1
+NUM_GENERATIONS = 300
 TOURNAMENT_SIZE = 5
 
 #Sensorimotor link settings
@@ -44,4 +44,4 @@ SIMULATION=1000
 RANDOM_SEED = None
 
 SIMULATION_END_PERCENTAGE = 100
-BATTERY_FITNESS_MODE = True
+BATTERY_FITNESS_MODE = False

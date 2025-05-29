@@ -437,28 +437,32 @@ class Animat:
             self.active = False
             
     def move(self, dt):
-        """Move the animat based on wheel speeds.
+        """Move the animat based on wheel speeds using differential drive.
         
         Args:
             dt: Time delta in seconds
         """
-        # Calculate forward velocity and rotation
-        forward_speed = (self.wheel_speeds[0] + self.wheel_speeds[1]) / 2.0
-        rotation_speed = (self.wheel_speeds[1] - self.wheel_speeds[0]) / (2.0 * self.radius)
+        # Standard differential drive kinematics
+        left_speed = self.wheel_speeds[0]
+        right_speed = self.wheel_speeds[1]
         
-        # Rotate direction vector
-        angle = rotation_speed * dt
-        cos_angle = np.cos(angle)
-        sin_angle = np.sin(angle)
+        # Forward velocity is average of wheel speeds
+        forward_velocity = (left_speed + right_speed) / 2.0
         
-        new_direction_x = cos_angle * self.direction[0] - sin_angle * self.direction[1]
-        new_direction_y = sin_angle * self.direction[0] + cos_angle * self.direction[1]
+        # Angular velocity is proportional to speed difference
+        # Using the wheelbase (distance between wheels) = 2 * radius
+        wheelbase = 2.0 * self.radius
+        angular_velocity = (right_speed - left_speed) / wheelbase
         
-        self.direction = np.array([new_direction_x, new_direction_y])
-        self.direction /= np.linalg.norm(self.direction)  # Renormalize
+        # Update orientation first
+        current_angle = np.arctan2(self.direction[1], self.direction[0])
+        new_angle = current_angle + angular_velocity * dt
         
-        # Move forward in the direction of travel
-        self.position += forward_speed * dt * self.direction
+        # Update direction vector
+        self.direction = np.array([np.cos(new_angle), np.sin(new_angle)])
+        
+        # Move forward in the new direction
+        self.position += forward_velocity * dt * self.direction
         
     def get_fitness(self):
         """Calculate the fitness of this animat based on survival time.

@@ -19,7 +19,7 @@ TRAP_COUNT = 9
 ANIMAT_SIZE = 5
 SOURCE_SIZE = 16
 ANIMAT_MAX_SPEED = 2.8
-SENSOR_RANGE = 100
+SENSOR_RANGE = 200
 BATTERY_MAX = 200  # Paper specifies maximum and initial level of 200
 BATTERY_DECAY_RATE = 0.5  # Paper specifies decreases by 1 each time step
 ANIMAT_MAX_LIFESPAN = 800 # Maximum simulation steps for fitness evaluation
@@ -44,4 +44,4 @@ SIMULATION=1000
 RANDOM_SEED = None
 
 SIMULATION_END_PERCENTAGE = 100
-BATTERY_FITNESS_MODE = False
+BATTERY_FITNESS_MODE = True

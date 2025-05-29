@@ -7,6 +7,8 @@ import sys
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+from datetime import datetime
 from config import settings
 from core.environment import Environment, EntityType
 from agents.base_agent import Animat
@@ -586,6 +588,30 @@ class Simulator:
         # Return the best genome
         return self.ga.get_best_genome()
         
+    def save_screenshot(self, filename_prefix="screenshot", reason="death"):
+        """Save a screenshot of the current pygame screen.
+        
+        Args:
+            filename_prefix: Prefix for the filename
+            reason: Reason for taking the screenshot (e.g., "death", "end")
+        """
+        if self.headless:
+            return
+            
+        # Create screenshots directory if it doesn't exist
+        screenshots_dir = "screenshots"
+        if not os.path.exists(screenshots_dir):
+            os.makedirs(screenshots_dir)
+            
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        filename = f"{filename_prefix}_{reason}_{timestamp}.png"
+        filepath = os.path.join(screenshots_dir, filename)
+        
+        # Save the screenshot
+        pygame.image.save(self.screen, filepath)
+        print(f"Screenshot saved: {filepath}")
+        
     def run_best_animat(self, genome, max_time=60, speed_multiplier=1.0):
         """Run a simulation with the best animat.
         
@@ -652,18 +678,24 @@ class Simulator:
             
             # Check if max time reached or animat died
             if max_time is not None and self.simulation_time >= max_time:
+                print(f"Simulation ended after {max_time} seconds")
+                self.save_screenshot("best_animat", "timeout")
                 self.is_running = False
                 break
                 
             if not animat.active:
-                print("Animat died")
+                print(f"Animat died after {self.simulation_time:.1f} seconds")
+                print(f"Final battery levels: Battery 1: {animat.batteries[0]:.1f}, Battery 2: {animat.batteries[1]:.1f}")
+                print(f"Final fitness: {animat.get_fitness():.3f}")
+                print(f"Total food/water captures: {len(self.capture_markers)}")
+                self.save_screenshot("best_animat", "death")
                 self.is_running = False
                 break
                 
             # Cap frame rate
             if not self.headless:
                 self.clock.tick(self.fps)
-    
+                
     def plot_stats(self):
         """Plot the evolution statistics."""
         plt.figure(figsize=(10, 6))
@@ -766,6 +798,7 @@ class Simulator:
                 print(f"Seth's animat died after {self.simulation_time:.1f} seconds")
                 print(f"Final battery levels: Battery 1: {animat.batteries[0]:.1f}, Battery 2: {animat.batteries[1]:.1f}")
                 print(f"Final fitness: {animat.get_fitness():.3f}")
+                self.save_screenshot("seth_animat", "death")
                 self.is_running = False
                 break
                 
@@ -777,7 +810,8 @@ class Simulator:
         if animat.active:
             print(f"Seth's animat survived the full simulation!")
             print(f"Final battery levels: Battery 1: {animat.batteries[0]:.1f}, Battery 2: {animat.batteries[1]:.1f}")
-            print(f"Final fitness: {animat.get_fitness():.3f}") 
+            print(f"Final fitness: {animat.get_fitness():.3f}")
+            self.save_screenshot("seth_animat", "survived")
 
     def update_camera(self):
         """Update the camera position to follow the animat if it goes outside the object area."""

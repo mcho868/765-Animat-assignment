@@ -232,7 +232,7 @@ class Environment:
         
         # If we couldn't find a non-overlapping position after many attempts,
         # try to find a position with minimal overlap or fallback to center
-        # print(f"Warning: Could not find non-overlapping position after {max_attempts} attempts. Using fallback.")
+        print(f"Warning: Could not find non-overlapping position after {max_attempts} attempts. Using fallback.")
         
         # Try a few more positions with smaller radius requirement (allow closer placement)
         for attempt in range(20):

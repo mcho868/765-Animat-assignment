@@ -8,6 +8,7 @@ import numpy as np
 from config import settings
 from core.simulator import Simulator
 from agents.agent_logic import simulate_animat
+from agents.manual_controller import ManualController
 
 def parse_arguments():
     """Parse command line arguments.
@@ -28,6 +29,8 @@ def parse_arguments():
                         help="Visualize evolution in progress instead of headless mode")
     parser.add_argument("--run-seth", action="store_true",
                         help="Run Seth's specific model from the paper with predefined link configurations")
+    parser.add_argument("--manual", action="store_true",
+                        help="Run in manual mode - control the animat with keyboard controls")
     
     return parser.parse_args()
 
@@ -53,6 +56,15 @@ def main():
     if args.run_seth:
         print("Running Seth's specific model from the paper...")
         simulator.run_seth_model(max_time=3000, speed_multiplier=1)  # 5 minute simulation
+        simulator.cleanup()
+        return
+    
+    # Check if running manual mode
+    if args.manual:
+        print("Starting manual mode - use WASD or arrow keys to control the animat")
+        print("Avoid red traps, collect green food and blue water, survive as long as possible!")
+        manual_controller = ManualController(simulator)
+        manual_controller.run()
         simulator.cleanup()
         return
     

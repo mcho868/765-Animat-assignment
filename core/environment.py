@@ -1,6 +1,6 @@
 """
 Environment module for the Animat simulation.
-Defines the 2D world, objects, and physics.
+Defines the 2D unbounded world with objects placed in a 200x200 area.
 """
 import numpy as np
 import random
@@ -49,17 +49,16 @@ class Trap(Entity):
         super().__init__(position, EntityType.TRAP, radius=settings.SOURCE_SIZE)
 
 class Environment:
-    """The 2D environment containing all entities."""
+    """The 2D unbounded environment with objects placed in a 200x200 area."""
     
-    def __init__(self, width=settings.ENV_SIZE, height=settings.ENV_SIZE):
-        """Initialize the environment.
+    def __init__(self, object_area_size=settings.ENV_SIZE):
+        """Initialize the unbounded environment.
         
         Args:
-            width: Width of the environment
-            height: Height of the environment
+            object_area_size: Size of the area where objects are placed (200x200 as per paper)
         """
-        self.width = width
-        self.height = height
+        self.object_area_size = object_area_size  # Objects appear within this area
+        # No width/height limits - environment is unbounded
         self.entities = []
         self.animats = []
         self.food_sources = []
@@ -81,7 +80,7 @@ class Environment:
             self.animats.append(entity)
     
     def initialize_random_environment(self):
-        """Initialize the environment with random placement of objects."""
+        """Initialize the environment with random placement of objects within the 200x200 area."""
         # Clear any existing entities
         self.entities = []
         self.animats = []
@@ -89,30 +88,19 @@ class Environment:
         self.water_sources = []
         self.traps = []
         
-        padding = settings.OBJECT_PLACEMENT_PADDING
-        
-        # Add food sources
+        # Add food sources within the object placement area
         for _ in range(settings.FOOD_COUNT):
-            position = (
-                random.randint(padding, self.width - padding),
-                random.randint(padding, self.height - padding)
-            )
+            position = self.get_random_spawn_position(radius=settings.SOURCE_SIZE)
             self.add_entity(FoodSource(position))
         
-        # Add water sources
+        # Add water sources within the object placement area
         for _ in range(settings.WATER_COUNT):
-            position = (
-                random.randint(padding, self.width - padding),
-                random.randint(padding, self.height - padding)
-            )
+            position = self.get_random_spawn_position(radius=settings.SOURCE_SIZE)
             self.add_entity(WaterSource(position))
         
-        # Add traps
+        # Add traps within the object placement area
         for _ in range(settings.TRAP_COUNT):
-            position = (
-                random.randint(padding, self.width - padding),
-                random.randint(padding, self.height - padding)
-            )
+            position = self.get_random_spawn_position(radius=settings.SOURCE_SIZE)
             self.add_entity(Trap(position))
     
     def check_collision(self, position, radius, exclude_entity=None):
@@ -188,57 +176,78 @@ class Environment:
             # Apply to the appropriate sensor based on entity type and side
             if entity.type == EntityType.FOOD:
                 if left_dot > 0:
-                    readings['food_left'] = max(readings['food_left'], sensor_value * left_dot)
+                    readings['food_left'] = max(readings['food_left'], sensor_value * 1.2 * left_dot)
                 if right_dot > 0:
-                    readings['food_right'] = max(readings['food_right'], sensor_value * right_dot)
+                    readings['food_right'] = max(readings['food_right'], sensor_value * 1.2 * right_dot)
             
             elif entity.type == EntityType.WATER:
                 if left_dot > 0:
-                    readings['water_left'] = max(readings['water_left'], sensor_value * left_dot)
+                    readings['water_left'] = max(readings['water_left'], sensor_value * 1.2 * left_dot)
                 if right_dot > 0:
-                    readings['water_right'] = max(readings['water_right'], sensor_value * right_dot)
+                    readings['water_right'] = max(readings['water_right'], sensor_value * 1.2 * right_dot)
             
             elif entity.type == EntityType.TRAP:
                 if left_dot > 0:
-                    readings['trap_left'] = max(readings['trap_left'], sensor_value * left_dot)
+                    readings['trap_left'] = max(readings['trap_left'], sensor_value * 1.2 * left_dot)
                 if right_dot > 0:
-                    readings['trap_right'] = max(readings['trap_right'], sensor_value * right_dot)
+                    readings['trap_right'] = max(readings['trap_right'], sensor_value * 1.2 * right_dot)
         
         return readings
     
     def respawn_entity(self, entity):
-        """Respawn an entity at a random location.
+        """Respawn an entity at a random location within the object placement area.
         
         Args:
             entity: The entity to respawn
         """
-        # Generate new random position
-        padding = settings.OBJECT_PLACEMENT_PADDING
-        new_position = (
-            random.randint(padding, self.width - padding),
-            random.randint(padding, self.height - padding)
-        )
+        # Get a new non-overlapping position
+        new_position = self.get_random_spawn_position(radius=entity.radius)
         
         # Update entity position
         entity.position = np.array(new_position, dtype=float)
-        
-    def wrap_position(self, entity):
-        """Wrap entity position if it goes outside environment boundaries.
+    
+    def get_random_spawn_position(self, radius=settings.ANIMAT_SIZE, max_attempts=100):
+        """Get a random spawn position that doesn't overlap with existing entities.
         
         Args:
-            entity: The entity to wrap
-        """
-        # Wrap x-coordinate
-        if entity.position[0] < 0:
-            entity.position[0] = self.width
-        elif entity.position[0] > self.width:
-            entity.position[0] = 0
+            radius: Radius of the entity to spawn
+            max_attempts: Maximum attempts to find a non-overlapping position
             
-        # Wrap y-coordinate
-        if entity.position[1] < 0:
-            entity.position[1] = self.height
-        elif entity.position[1] > self.height:
-            entity.position[1] = 0
+        Returns:
+            Tuple (x, y) of a valid spawn position
+        """
+        padding = settings.OBJECT_PLACEMENT_PADDING
+        
+        for attempt in range(max_attempts):
+            # Generate random position within the object placement area
+            x = random.randint(padding + radius, self.object_area_size - padding - radius)
+            y = random.randint(padding + radius, self.object_area_size - padding - radius)
+            position = (x, y)
+            
+            # Check if this position collides with any existing entity
+            collision, _ = self.check_collision(position, radius)
+            
+            if not collision:
+                return position
+        
+        # If we couldn't find a non-overlapping position after many attempts,
+        # try to find a position with minimal overlap or fallback to center
+        print(f"Warning: Could not find non-overlapping position after {max_attempts} attempts. Using fallback.")
+        
+        # Try a few more positions with smaller radius requirement (allow closer placement)
+        for attempt in range(20):
+            x = random.randint(padding + radius, self.object_area_size - padding - radius)
+            y = random.randint(padding + radius, self.object_area_size - padding - radius)
+            position = (x, y)
+            
+            # Check with reduced collision radius (allow tighter packing)
+            collision, _ = self.check_collision(position, radius * 0.8)
+            
+            if not collision:
+                return position
+        
+        # Final fallback: return center position (this ensures we always return a valid position)
+        return (self.object_area_size / 2, self.object_area_size / 2)
     
     def update(self, dt):
         """Update the environment for one timestep.
@@ -254,8 +263,8 @@ class Environment:
             # Update animat position
             animat.update(dt, self)
             
-            # Wrap position if animat moves outside boundaries
-            self.wrap_position(animat)
+            # No position wrapping - environment is unbounded!
+            # Animats can move freely in unlimited space
             
             # Check for collisions with entities
             collision, entity = self.check_collision(animat.position, animat.radius, animat)
@@ -264,19 +273,65 @@ class Environment:
                 if entity.type == EntityType.FOOD:
                     # Replenish battery 1
                     animat.batteries[0] = settings.BATTERY_MAX
-                    # Make food disappear and reappear at random location
+                    # Make food disappear and reappear at random location within object area
                     self.respawn_entity(entity)
                     
                 elif entity.type == EntityType.WATER:
                     # Replenish battery 2
                     animat.batteries[1] = settings.BATTERY_MAX
-                    # Make water disappear and reappear at random location
+                    # Make water disappear and reappear at random location within object area
                     self.respawn_entity(entity)
                     
                 elif entity.type == EntityType.TRAP:
                     # Animat dies
                     animat.active = False
+                    animat.batteries[0] = 0
+                    animat.batteries[1] = 0
                     
             # Check if batteries are depleted
             if animat.batteries[0] <= 0 and animat.batteries[1] <= 0:
-                animat.active = False 
+                animat.active = False
+    
+    def check_all_entities_for_overlaps(self):
+        """Check if any entities overlap with each other.
+        
+        Returns:
+            List of tuples (entity1, entity2, overlap_distance) for overlapping entities
+        """
+        overlaps = []
+        
+        for i, entity1 in enumerate(self.entities):
+            if not entity1.active:
+                continue
+                
+            for j, entity2 in enumerate(self.entities[i+1:], i+1):
+                if not entity2.active:
+                    continue
+                    
+                # Calculate distance between entities
+                distance = np.linalg.norm(entity1.position - entity2.position)
+                required_distance = entity1.radius + entity2.radius
+                
+                if distance < required_distance:
+                    overlap_distance = required_distance - distance
+                    overlaps.append((entity1, entity2, overlap_distance))
+        
+        return overlaps
+    
+    def print_entity_layout_info(self):
+        """Print information about entity placement for debugging."""
+        print(f"Environment layout info:")
+        print(f"- Environment size: {self.object_area_size}x{self.object_area_size}")
+        print(f"- Total entities: {len(self.entities)}")
+        print(f"- Food sources: {len(self.food_sources)}")
+        print(f"- Water sources: {len(self.water_sources)}")
+        print(f"- Traps: {len(self.traps)}")
+        print(f"- Animats: {len(self.animats)}")
+        
+        overlaps = self.check_all_entities_for_overlaps()
+        if overlaps:
+            print(f"WARNING: Found {len(overlaps)} overlapping entity pairs:")
+            for entity1, entity2, overlap_dist in overlaps:
+                print(f"  - {entity1.type.name} at {entity1.position} overlaps with {entity2.type.name} at {entity2.position} by {overlap_dist:.2f} units")
+        else:
+            print("✓ No entity overlaps detected") 

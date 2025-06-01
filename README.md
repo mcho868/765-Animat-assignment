@@ -106,3 +106,44 @@ Battery levels are displayed as colored bars above each animat.
 ## License
 
 This project is for educational purposes.
+
+# Manual Mode
+
+A new interactive manual mode has been added that allows you to control an animat directly with keyboard controls.
+
+## Running Manual Mode
+
+```bash
+python main.py --manual
+```
+
+## Controls
+
+- **WASD** or **Arrow Keys**: Move and turn the animat
+- **ESC**: Quit the simulation
+- **R**: Restart the game (when animat dies)
+
+## Gameplay
+
+- **Green circles**: Food sources (restore left battery)
+- **Blue circles**: Water sources (restore right battery)  
+- **Red circles**: Traps (avoid these - they kill the animat instantly!)
+
+## Objective
+
+Survive as long as possible by:
+1. Avoiding red traps
+2. Collecting green food to restore your left battery
+3. Collecting blue water to restore your right battery
+4. Managing your energy - both batteries drain over time
+
+The game ends when you hit a trap or run out of energy (either battery reaches 0). Your survival time is tracked and displayed in real-time.
+
+## UI Information
+
+The manual mode displays:
+- Control instructions
+- Real-time survival time
+- Battery levels with visual bars
+- Current position
+- Color-coded battery status (green=good, orange=low, red=critical)

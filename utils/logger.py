@@ -32,7 +32,7 @@ class Logger:
             
         with open(self.behavior_log_file, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(["Timestamp", "Animat ID", "Left Wheel", "Right Wheel", "Direction X", "Direction Y"])
+            writer.writerow(["Timestamp", "Animat ID", "Left Wheel", "Right Wheel", "Direction X", "Direction Y", "Speed"])
             
         self.simulation_data = {
             "start_time": time.time(),
@@ -62,9 +62,12 @@ class Logger:
             wheel_speeds: [left_wheel, right_wheel] speeds
             direction: (x, y) direction vector
         """
+        # Calculate the forward speed as the average of the two wheel speeds
+        forward_speed = (wheel_speeds[0] + wheel_speeds[1]) / 2.0
+        
         with open(self.behavior_log_file, 'a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([time.time(), animat_id, wheel_speeds[0], wheel_speeds[1], direction[0], direction[1]])
+            writer.writerow([time.time(), animat_id, wheel_speeds[0], wheel_speeds[1], direction[0], direction[1], forward_speed])
     
     def log_generation(self, generation_num, fitness_scores, best_genome, avg_fitness):
         """Log data about a completed generation in the genetic algorithm.

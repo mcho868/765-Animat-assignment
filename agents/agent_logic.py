@@ -33,25 +33,16 @@ class GeneticAlgorithm:
             self.population.append(animat.genome)
             
         self.fitnesses = [0] * self.population_size
-        
-    def evaluate_fitness(self, simulate_function):
-        """Evaluate fitness of each genome in the population.
-        
-        Args:
-            simulate_function: Function that takes a genome and returns its fitness
-        """
-        self.fitnesses = []
-        
-        for genome in self.population:
-            fitness = simulate_function(genome)
-            self.fitnesses.append(fitness)
+
+    def set_fitness(self, fitness):
+        self.fitness = fitness
+
+    def set_population(self, population):
+        self.population = population
+
+        self.population_size = len(population)
             
-        # Track best genome
-        best_idx = np.argmax(self.fitnesses)
-        if self.best_genome is None or self.fitnesses[best_idx] > self.best_fitness:
-            self.best_genome = self.population[best_idx].copy()
-            self.best_fitness = self.fitnesses[best_idx]
-            
+    # Maybe sample without repitition - Vince
     def tournament_selection(self):
         """Select a genome using tournament selection.
         
@@ -97,10 +88,11 @@ class GeneticAlgorithm:
                 thresh1_pos = i + 2  # Position of thresh1
                 thresh2_pos = i + 4  # Position of thresh2
                 
-                # If thresh2 < thresh1 after crossover, adjust thresh2
                 if child[thresh2_pos] < child[thresh1_pos]:
-                    child[thresh2_pos] = child[thresh1_pos]
-        
+                    if child[thresh1_pos] >= 98:
+                        child[thresh1_pos] = child[thresh1_pos] - random.randint(1,5)
+                    child[thresh2_pos] = min(99, child[thresh1_pos] + random.randint(1, 10))
+
         return child1, child2
         
     def mutate(self, genome):
@@ -117,23 +109,25 @@ class GeneticAlgorithm:
         for i in range(len(mutated_genome)):
             # Apply mutation with probability mutation_rate
             if random.random() < self.mutation_rate:
-                # Battery genes (every 9th gene) can only be 0 or 1
-                if (i % settings.LINK_PARAM_COUNT == 8) and (i < settings.NUM_LINKS * settings.LINK_PARAM_COUNT):
-                    mutated_genome[i] = 1 - mutated_genome[i]  # Flip 0 to 1 or 1 to 0
-                else:
-                    # For other genes, add a random value between -10 and 10
-                    mutated_genome[i] += random.randint(-10, 10)
-                    # Keep values in appropriate ranges
-                    mutated_genome[i] = max(0, min(99, mutated_genome[i]))
+                # For other genes, add a random value between -10 and 10
+                random_value = random.randint(-10, 10)
+                while random_value == 0:
+                    random_value = random.randint(-10, 10)
+                mutated_genome[i] += random_value
+                # Keep values in appropriate ranges
+                mutated_genome[i] = mutated_genome[i]%100 # Wrap around
+                # mutated_genome[i] = max(0, min(99, mutated_genome[i]))
                     
         # Enforce thresh2 >= thresh1 constraint after mutation
         for i in range(0, settings.NUM_LINKS * settings.LINK_PARAM_COUNT, settings.LINK_PARAM_COUNT):
             thresh1_pos = i + 2  # Position of thresh1
             thresh2_pos = i + 4  # Position of thresh2
             
-            # If thresh2 < thresh1 after mutation, adjust thresh2
             if mutated_genome[thresh2_pos] < mutated_genome[thresh1_pos]:
-                mutated_genome[thresh2_pos] = mutated_genome[thresh1_pos]
+                if mutated_genome[thresh1_pos] >= 98:
+                    mutated_genome[thresh1_pos] = mutated_genome[thresh1_pos] - random.randint(1, 5)
+                mutated_genome[thresh2_pos] = min(99, mutated_genome[thresh1_pos] + random.randint(1, 10))
+
                     
         return mutated_genome
         

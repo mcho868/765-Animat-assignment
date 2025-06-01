@@ -101,12 +101,12 @@ class Animat:
                 # Set thresh2 to be thresh1 + a random offset (0 to remaining range)
                 remaining_range = 99 - self.genome[thresh1_pos]
                 if remaining_range > 0:
-                    self.genome[thresh2_pos] = self.genome[thresh1_pos] + np.random.randint(0, remaining_range + 1)
+                    self.genome[thresh2_pos] = self.genome[thresh1_pos] + np.random.randint(1, remaining_range + 1)
                 else:
-                    self.genome[thresh2_pos] = self.genome[thresh1_pos]
+                    self.genome[thresh1_pos] = max(0, self.genome[thresh1_pos] - np.random.randint(1, 10))
             
-            # Set battery indicators for the 9 encoded links (0=battery1, 1=battery2)
-            self.genome[i + 8] = np.random.choice([0, 1])  # 0 for battery 1, 1 for battery 2
+            # # Set battery indicators for the 9 encoded links (0=battery1, 1=battery2)
+            # self.genome[i + 8] = np.random.choice([0, 1])  # 0 for battery 1, 1 for battery 2 # Just check if even or odd
             
     def initialize_seth_genome(self):
         """Initialize a genome based on Seth's specific link configurations from the paper.
@@ -269,7 +269,7 @@ class Animat:
             # Offset modulation O ∈ (-1 : 1)  
             offset_mod_val = self._scale_genome_value(self.genome[i + 7], -1.0, 1.0)
             
-            battery_val = self.genome[i + 8]  # Already 0 or 1, used directly
+            battery_val = self.genome[i + 8]%2  # Already 0 or 1, used directly
 
             link_params = {
                 'offset': offset_val,

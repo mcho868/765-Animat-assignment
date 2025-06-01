@@ -580,6 +580,8 @@ class Simulator:
             
             # Evolve next generation (except for last generation)
             if gen < num_generations - 1:
+                self.ga.set_fitness = fitnesses
+                # self.ga.set_population =
                 self.ga.evolve_generation()
                 
         # Restore headless setting

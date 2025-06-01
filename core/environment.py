@@ -284,9 +284,9 @@ class Environment:
                     
                 elif entity.type == EntityType.TRAP:
                     # Animat dies
-                    animat.active = False
                     animat.batteries[0] = 0
                     animat.batteries[1] = 0
+                    # animat.active = False # redundant
                     
             # Check if batteries are depleted
             if animat.batteries[0] <= 0 and animat.batteries[1] <= 0:

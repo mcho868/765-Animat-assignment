@@ -63,7 +63,7 @@ def main():
     if args.manual:
         print("Starting manual mode - use WASD or arrow keys to control the animat")
         print("Avoid red traps, collect green food and blue water, survive as long as possible!")
-        manual_controller = ManualController(simulator)
+        manual_controller = ManualController(simulator, num_agents=2)
         manual_controller.run()
         simulator.cleanup()
         return
